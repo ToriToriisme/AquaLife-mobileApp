@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "772431325946",
+    "project_id": "aqualife-d96c5",
+    "storage_bucket": "aqualife-d96c5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:772431325946:android:3978f24e2e54124b607743",
+        "android_client_info": {
+          "package_name": "com.example.aqualife"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCo11VBahi-1WYwKcxOeT5_Ar-nkKhA1I0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
