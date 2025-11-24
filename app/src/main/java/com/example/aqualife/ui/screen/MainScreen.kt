@@ -50,9 +50,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.aqualife.R
+import com.example.aqualife.ui.components.SkeletonGrid
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
-import java.text.NumberFormat
-import java.util.Locale
+import com.example.aqualife.utils.FormatUtils
 
 // --- 1. MODEL DỮ LIỆU ---
 data class FishProduct(
@@ -128,8 +130,7 @@ val banners = listOf(
     BannerItem("Cá Cảnh", "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=800", "Cá cảnh")
 )
 
-fun formatCurrency(amount: Int) = "${NumberFormat.getNumberInstance(Locale("vi", "VN")).format(amount)} đ"
-fun parseCurrency(priceStr: String) = priceStr.replace(".", "").replace(" đ", "").replace(",", "").toIntOrNull() ?: 0
+// Use FormatUtils.formatCurrency() instead
 fun toggleFavorite(fishId: Int) { if (favoriteFishIds.contains(fishId)) favoriteFishIds.remove(fishId) else favoriteFishIds.add(fishId) }
 fun addToCart(fish: FishProduct) { val existing = globalCartItems.find { it.fish.id == fish.id }; if (existing != null) existing.quantity.value++ else globalCartItems.add(CartItem(fish, mutableStateOf(1))) }
 
@@ -151,14 +152,57 @@ fun MainScreen(navController: NavController) {
         var selectedItem by rememberSaveable { mutableIntStateOf(0) }
         val items = listOf("Home", "Khám phá", "Giỏ hàng", "Thông báo", "Tôi")
         val icons = listOf(Icons.Default.Home, Icons.Default.Search, Icons.Outlined.ShoppingCart, Icons.Outlined.Notifications, Icons.Default.Person)
-        Scaffold(bottomBar = { NavigationBar(containerColor = MaterialTheme.colorScheme.surface) { items.forEachIndexed { index, item -> NavigationBarItem(icon = { if (index == 2 && globalCartItems.isNotEmpty()) BadgedBox(badge = { Badge { Text("${globalCartItems.size}") } }) { Icon(icons[index], contentDescription = item) } else Icon(icons[index], contentDescription = item) }, selected = selectedItem == index, onClick = { selectedItem = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.primary, unselectedIconColor = Color.Gray, indicatorColor = Color.Transparent)) } } }) { innerPadding ->
+        
+        // Get notification count
+        val notificationViewModel: com.example.aqualife.ui.viewmodel.NotificationViewModel = hiltViewModel()
+        val unreadCount by notificationViewModel.unreadCount.collectAsState()
+        
+        // Get cart count
+        val cartViewModel: com.example.aqualife.ui.viewmodel.CartViewModel = hiltViewModel()
+        val cartItems by cartViewModel.cartItems.collectAsState()
+        
+        Scaffold(
+            bottomBar = { 
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) { 
+                    items.forEachIndexed { index, item -> 
+                        NavigationBarItem(
+                            icon = { 
+                                when {
+                                    index == 2 && cartItems.isNotEmpty() -> {
+                                        BadgedBox(badge = { Badge { Text("${cartItems.size}") } }) { 
+                                            Icon(icons[index], contentDescription = item) 
+                                        }
+                                    }
+                                    index == 3 && unreadCount > 0 -> {
+                                        BadgedBox(badge = { Badge { Text("$unreadCount") } }) { 
+                                            Icon(icons[index], contentDescription = item) 
+                                        }
+                                    }
+                                    else -> Icon(icons[index], contentDescription = item)
+                                }
+                            }, 
+                            selected = selectedItem == index, 
+                            onClick = { selectedItem = index }, 
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary, 
+                                unselectedIconColor = Color.Gray, 
+                                indicatorColor = Color.Transparent
+                            )
+                        ) 
+                    } 
+                } 
+            }
+        ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding).background(MaterialTheme.colorScheme.background)) {
                 when (selectedItem) {
                     0 -> HomeScreenContent(navController, onGoToCart = { selectedItem = 2 })
                     1 -> SearchScreen(navController)
-                    2 -> CartScreen(navController, onGoToSearch = { selectedItem = 1 }, onBackToSearch = { selectedItem = 1 })
+                    2 -> CartScreen(navController, onGoToSearch = { selectedItem = 1 }, onBackToSearch = { selectedItem = 1 }, viewModel = cartViewModel)
+                    3 -> NotificationsScreen(navController, notificationViewModel)
                     4 -> ProfileScreen(navController)
-                    else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Chức năng đang phát triển", color = MaterialTheme.colorScheme.onBackground) }
+                    else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
+                        Text("Chức năng đang phát triển", color = MaterialTheme.colorScheme.onBackground) 
+                    }
                 }
             }
         }
@@ -168,12 +212,40 @@ fun MainScreen(navController: NavController) {
 // --- 6. HOME SCREEN (BANNER TỰ TRƯỢT & LỌC CÁ) ---
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun HomeScreenContent(navController: NavController, onGoToCart: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeScreenContent(
+    navController: NavController, 
+    onGoToCart: () -> Unit, 
+    modifier: Modifier = Modifier,
+    viewModel: com.example.aqualife.ui.viewmodel.HomeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+) {
     val lazyRowState = rememberLazyListState()
     val textColor = MaterialTheme.colorScheme.onBackground
     val bgColor = MaterialTheme.colorScheme.background
+    
+    // Get data from ViewModel (connects to Firebase)
+    val allFish by viewModel.allFish.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    
+    // Convert FishEntity to FishProduct for compatibility
+    val fishList = allFish.map { entity ->
+        FishProduct(
+            id = entity.id.toIntOrNull() ?: 0,
+            name = entity.name,
+            price = FormatUtils.formatCurrency(entity.priceInt),
+            priceInt = entity.priceInt,
+            imageUrl = entity.imageUrl,
+            category = entity.category,
+            habitat = entity.habitat,
+            maxWeight = entity.maxWeight,
+            diet = entity.diet
+        )
+    }
+    
     var searchText by rememberSaveable { mutableStateOf("") }
-    val searchResults by remember { derivedStateOf { if (searchText.isBlank()) emptyList() else largeFishList.filter { it.name.contains(searchText, ignoreCase = true) } } }
+    val searchResults by remember { derivedStateOf { 
+        if (searchText.isBlank()) emptyList() 
+        else fishList.filter { it.name.contains(searchText, ignoreCase = true) } 
+    } }
 
     // State cho Banner tự trượt
     val pagerState = rememberPagerState(pageCount = { banners.size })
@@ -235,8 +307,17 @@ fun HomeScreenContent(navController: NavController, onGoToCart: () -> Unit, modi
                 // GỢI Ý
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { navController.navigate("fish_list/all") }) { Text("Gợi ý các loại cá", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor); Spacer(modifier = Modifier.weight(1f)); Icon(imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(24.dp), tint = textColor) }
                 Spacer(modifier = Modifier.height(12.dp))
-                LaunchedEffect(Unit) { while (true) { delay(2000); if (lazyRowState.firstVisibleItemIndex < 10) lazyRowState.animateScrollToItem(lazyRowState.firstVisibleItemIndex + 1) else lazyRowState.scrollToItem(0) } }
-                LazyRow(state = lazyRowState, horizontalArrangement = Arrangement.spacedBy(12.dp)) { items(largeFishList.take(20)) { fish -> FishItemCard(fish) { navController.navigate("fish_detail/${fish.id}") } } }
+                // Show skeleton while loading
+                if (isLoading) {
+                    SkeletonGrid()
+                } else {
+                    LaunchedEffect(Unit) { while (true) { delay(2000); if (lazyRowState.firstVisibleItemIndex < 10) lazyRowState.animateScrollToItem(lazyRowState.firstVisibleItemIndex + 1) else lazyRowState.scrollToItem(0) } }
+                    LazyRow(state = lazyRowState, horizontalArrangement = Arrangement.spacedBy(12.dp)) { 
+                        items(fishList.take(20)) { fish -> 
+                            FishItemCard(fish) { navController.navigate("fish_detail/${fish.id}") } 
+                        } 
+                    }
+                }
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
@@ -273,14 +354,276 @@ fun FishListScreen(navController: NavController, category: String) {
 }
 
 // --- CÁC MÀN HÌNH KHÁC (GIỮ NGUYÊN) ---
-@OptIn(ExperimentalMaterial3Api::class) @Composable fun CartScreen(navController: NavController, onGoToSearch: () -> Unit, onBackToSearch: () -> Unit) { BackHandler { onBackToSearch() }; val totalPrice = globalCartItems.sumOf { it.fish.priceInt * it.quantity.value }; Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("Giỏ Hàng", fontWeight = FontWeight.Bold) }, navigationIcon = { IconButton(onClick = onBackToSearch) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }, colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background, titleContentColor = MaterialTheme.colorScheme.onBackground)) }, bottomBar = { if (globalCartItems.isNotEmpty()) { Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(8.dp), shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)) { Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Tổng cộng:", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface); Text(formatCurrency(totalPrice), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Red) }; Spacer(modifier = Modifier.height(16.dp)); Button(onClick = { }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("Thanh Toán (${globalCartItems.size} món)", fontWeight = FontWeight.Bold) } } } } }) { padding -> if (globalCartItems.isEmpty()) { Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Icon(Icons.Outlined.ShoppingCart, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color.Gray); Spacer(modifier = Modifier.height(16.dp)); Text("Giỏ hàng trống", fontSize = 18.sp, color = Color.Gray); Spacer(modifier = Modifier.height(16.dp)); Button(onClick = onGoToSearch, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("Mua sắm ngay") } } } else { LazyColumn(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(globalCartItems) { item -> CartItemRow(item, isCartItem = true) } } } } }
-@Composable fun CartItemRow(item: CartItem, isCartItem: Boolean) { Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp)) { Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { AsyncImage(model = item.fish.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)), placeholder = painterResource(R.drawable.bg_dolphin)); Spacer(modifier = Modifier.width(16.dp)); Column(modifier = Modifier.weight(1f)) { Text(item.fish.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface); Text(item.fish.category, fontSize = 12.sp, color = Color.Gray); Spacer(modifier = Modifier.height(4.dp)); Text(item.fish.price, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }; if (isCartItem) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = { if (item.quantity.value > 1) item.quantity.value-- }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Decrease", tint = Color.Gray) }; Text("${item.quantity.value}", modifier = Modifier.padding(horizontal = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface); IconButton(onClick = { item.quantity.value++ }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.AddCircleOutline, contentDescription = "Increase", tint = MaterialTheme.colorScheme.primary) } }; Spacer(modifier = Modifier.height(4.dp)); TextButton(onClick = { globalCartItems.remove(item) }) { Text("Xóa", color = Color.Red, fontSize = 12.sp) } } } } } }
+@OptIn(ExperimentalMaterial3Api::class) 
+@Composable 
+fun CartScreen(
+    navController: NavController, 
+    onGoToSearch: () -> Unit, 
+    onBackToSearch: () -> Unit,
+    viewModel: com.example.aqualife.ui.viewmodel.CartViewModel = hiltViewModel()
+) { 
+    BackHandler { onBackToSearch() }
+    
+    val cartItems by viewModel.cartItems.collectAsState()
+    val totalPrice by viewModel.totalPrice.collectAsState()
+    
+    Scaffold(
+        topBar = { 
+            CenterAlignedTopAppBar(
+                title = { Text("Giỏ Hàng", fontWeight = FontWeight.Bold) }, 
+                navigationIcon = { 
+                    IconButton(onClick = onBackToSearch) { 
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") 
+                    } 
+                }, 
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background, 
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                )
+            ) 
+        }, 
+        bottomBar = { 
+            if (cartItems.isNotEmpty()) { 
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+                    elevation = CardDefaults.cardElevation(8.dp), 
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                ) { 
+                    Column(modifier = Modifier.padding(16.dp)) { 
+                        Row(
+                            modifier = Modifier.fillMaxWidth(), 
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) { 
+                            Text("Tổng cộng:", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text(FormatUtils.formatCurrency(totalPrice.toInt()), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Red) 
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { navController.navigate("payment") }, 
+                            modifier = Modifier.fillMaxWidth().height(50.dp), 
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) { 
+                            Text("Thanh Toán (${cartItems.size} món)", fontWeight = FontWeight.Bold) 
+                        } 
+                    } 
+                } 
+            } 
+        }
+    ) { padding -> 
+        if (cartItems.isEmpty()) { 
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background), 
+                horizontalAlignment = Alignment.CenterHorizontally, 
+                verticalArrangement = Arrangement.Center
+            ) { 
+                Icon(Icons.Outlined.ShoppingCart, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Giỏ hàng trống", fontSize = 18.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onGoToSearch, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { 
+                    Text("Mua sắm ngay") 
+                } 
+            } 
+        } else { 
+            LazyColumn(
+                modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background), 
+                contentPadding = PaddingValues(16.dp), 
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) { 
+                items(cartItems) { item -> 
+                    CartItemRow(
+                        item = item, 
+                        isCartItem = true,
+                        onUpdateQuantity = { fishId, quantity -> viewModel.updateQuantity(fishId, quantity) },
+                        onRemove = { fishId -> viewModel.removeFromCart(fishId) }
+                    ) 
+                } 
+            } 
+        } 
+    } 
+}
+@Composable 
+fun CartItemRow(
+    item: com.example.aqualife.ui.viewmodel.CartItemUi, 
+    isCartItem: Boolean,
+    onUpdateQuantity: (String, Int) -> Unit = { _, _ -> },
+    onRemove: (String) -> Unit = {}
+) { 
+    Card(
+        shape = RoundedCornerShape(12.dp), 
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) { 
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(), 
+            verticalAlignment = Alignment.CenterVertically
+        ) { 
+            AsyncImage(
+                model = item.fish.imageUrl, 
+                contentDescription = null, 
+                contentScale = ContentScale.Crop, 
+                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)), 
+                placeholder = painterResource(R.drawable.bg_dolphin)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) { 
+                Text(item.fish.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(item.fish.category, fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(FormatUtils.formatCurrency(item.fish.priceInt), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) 
+            }
+            if (isCartItem) { 
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { 
+                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                        IconButton(
+                            onClick = { 
+                                if (item.quantity > 1) {
+                                    onUpdateQuantity(item.fish.id.toString(), item.quantity - 1)
+                                }
+                            }, 
+                            modifier = Modifier.size(30.dp)
+                        ) { 
+                            Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Decrease", tint = Color.Gray) 
+                        }
+                        Text("${item.quantity}", modifier = Modifier.padding(horizontal = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        IconButton(
+                            onClick = { onUpdateQuantity(item.fish.id.toString(), item.quantity + 1) }, 
+                            modifier = Modifier.size(30.dp)
+                        ) { 
+                            Icon(Icons.Default.AddCircleOutline, contentDescription = "Increase", tint = MaterialTheme.colorScheme.primary) 
+                        } 
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextButton(onClick = { onRemove(item.fish.id.toString()) }) { 
+                        Text("Xóa", color = Color.Red, fontSize = 12.sp) 
+                    } 
+                } 
+            } 
+        } 
+    } 
+}
 @Composable fun SearchScreen(navController: NavController) { var searchText by rememberSaveable { mutableStateOf("") }; val searchResults by remember { derivedStateOf { if (searchText.isBlank()) emptyList() else largeFishList.filter { it.name.contains(searchText, ignoreCase = true) } } }; Column(modifier = Modifier.fillMaxSize().padding(16.dp)) { Text("Khám Phá", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(bottom = 16.dp)); OutlinedTextField(value = searchText, onValueChange = { searchText = it }, placeholder = { Text("Nhập tên cá...") }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface)); Spacer(modifier = Modifier.height(16.dp)); if (searchText.isEmpty()) { Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(60.dp), tint = Color.LightGray); Text("Nhập tên cá để tìm kiếm", color = Color.Gray) } } else { if (searchResults.isEmpty()) { Text("Không tìm thấy kết quả.", color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally)) } else { LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) { items(searchResults) { fish -> FishListItem(fish = fish, navController = navController) } } } } } }
 @OptIn(ExperimentalMaterial3Api::class) @Composable fun ProfileScreen(navController: NavController) { var showAccountMenu by remember { mutableStateOf(false) }; var showSettingsMenu by remember { mutableStateOf(false) }; var showEditDialog by remember { mutableStateOf(false) }; var isPrivateAccount by remember { mutableStateOf(false) }; val isDarkTheme = LocalThemeState.current; val context = LocalContext.current; if (showEditDialog) { var tempName by remember { mutableStateOf(globalProfileName) }; var tempBio by remember { mutableStateOf(globalProfileBio) }; AlertDialog(onDismissRequest = { showEditDialog = false }, title = { Text("Chỉnh sửa hồ sơ") }, text = { Column { OutlinedTextField(value = tempName, onValueChange = { tempName = it }, label = { Text("Tên hiển thị") }); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(value = tempBio, onValueChange = { tempBio = it }, label = { Text("Tiểu sử") }) } }, confirmButton = { Button(onClick = { globalProfileName = tempName; globalProfileBio = tempBio; showEditDialog = false }) { Text("Lưu") } }, dismissButton = { TextButton(onClick = { showEditDialog = false }) { Text("Hủy") } }) }; Scaffold(topBar = { CenterAlignedTopAppBar(colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background, titleContentColor = MaterialTheme.colorScheme.onBackground), title = { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { showAccountMenu = true }) { Text(globalProfileName, fontWeight = FontWeight.Bold, fontSize = 20.sp); Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(20.dp)); DropdownMenu(expanded = showAccountMenu, onDismissRequest = { showAccountMenu = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) { DropdownMenuItem(text = { Text("Thêm tài khoản", color = MaterialTheme.colorScheme.onSurface) }, onClick = { showAccountMenu = false; navController.navigate("login") }, leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) }); DropdownMenuItem(text = { Text("Đăng xuất", color = Color.Red) }, onClick = { showAccountMenu = false; navController.navigate("welcome") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = Color.Red) }) } } }, actions = { IconButton(onClick = { val newPost = UserPost(System.currentTimeMillis().toInt(), largeFishList.random().imageUrl); globalMyPosts.add(0, newPost) }) { Icon(Icons.Outlined.AddBox, contentDescription = "Add Post", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onBackground) }; Box { IconButton(onClick = { showSettingsMenu = true }) { Icon(Icons.Outlined.Menu, contentDescription = "Menu", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onBackground) }; DropdownMenu(expanded = showSettingsMenu, onDismissRequest = { showSettingsMenu = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) { DropdownMenuItem(text = { Text(if(isPrivateAccount) "Tắt Riêng tư" else "Bật Riêng tư") }, onClick = { isPrivateAccount = !isPrivateAccount }, leadingIcon = { Icon(if(isPrivateAccount) Icons.Filled.Lock else Icons.Outlined.LockOpen, contentDescription = null) }); DropdownMenuItem(text = { Text(if(isDarkTheme.value) "Chế độ Sáng" else "Chế độ Tối") }, onClick = { isDarkTheme.value = !isDarkTheme.value; val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE); prefs.edit().putBoolean("is_dark_mode", isDarkTheme.value).apply() }, leadingIcon = { Icon(if(isDarkTheme.value) Icons.Filled.LightMode else Icons.Filled.DarkMode, contentDescription = null) }); HorizontalDivider(); DropdownMenuItem(text = { Text("Đăng xuất", color = Color.Red) }, onClick = { navController.navigate("welcome") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = Color.Red) }) } } }) }) { padding -> Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background)) { Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Image(painter = painterResource(id = R.drawable.bg_dolphin), contentDescription = "Avatar", contentScale = ContentScale.Crop, modifier = Modifier.size(86.dp).clip(CircleShape).border(1.dp, Color.Gray, CircleShape)); Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) { ProfileStatItem("${globalMyPosts.size}", "Posts"); ProfileStatItem("0", "Followers"); ProfileStatItem("0", "Following") } }; Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { Text(globalProfileName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground); if (isPrivateAccount) Text("🔒 Tài khoản riêng tư", fontSize = 13.sp, color = Color.Gray); Text(globalProfileBio, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground) }; Button(onClick = { showEditDialog = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(34.dp), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = if (isDarkTheme.value) Color(0xFF333333) else Color(0xFFEFEFEF), contentColor = MaterialTheme.colorScheme.onBackground), contentPadding = PaddingValues(0.dp)) { Text("Edit profile", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }; Spacer(modifier = Modifier.height(10.dp)); Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.GridOn, contentDescription = "Grid", modifier = Modifier.padding(10.dp).size(28.dp), tint = MaterialTheme.colorScheme.onBackground); HorizontalDivider(color = MaterialTheme.colorScheme.onBackground, thickness = 1.5.dp) }; if (globalMyPosts.isEmpty()) { Column(modifier = Modifier.fillMaxSize().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Outlined.CameraAlt, contentDescription = null, modifier = Modifier.size(60.dp).padding(bottom = 10.dp), tint = Color.Gray); Text("Chưa có bài viết nào", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onBackground); Spacer(modifier = Modifier.height(20.dp)); Button(onClick = { val newPost = UserPost(System.currentTimeMillis().toInt(), largeFishList.random().imageUrl); globalMyPosts.add(0, newPost) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("Tạo bài viết đầu tiên") } } } else { LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(0.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) { items(globalMyPosts) { post -> AsyncImage(model = post.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.aspectRatio(1f).clickable { navController.navigate("post_detail/${post.id}") }) } } } } } }
 @Composable fun FishItemCard(fish: FishProduct, onClick: () -> Unit) { Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), modifier = Modifier.width(140.dp).clickable { onClick() }) { Column { Box { AsyncImage(model = fish.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(100.dp), placeholder = painterResource(R.drawable.bg_dolphin)); val isFav = favoriteFishIds.contains(fish.id); Icon(imageVector = if(isFav) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Like", tint = if(isFav) Color.Red else Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(24.dp).clickable { toggleFavorite(fish.id) }) }; Column(modifier = Modifier.padding(8.dp)) { Text(text = fish.category, fontSize = 10.sp, color = Color.Gray); Text(text = fish.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(4.dp)); Text(text = fish.price, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } } } }
 @OptIn(ExperimentalMaterial3Api::class) @Composable fun PostDetailScreen(navController: NavController, postId: Int) { val post = globalMyPosts.find { it.id == postId }; var commentText by remember { mutableStateOf("") }; if (post == null) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Bài viết không tồn tại") } } else { Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("Bài viết", fontWeight = FontWeight.Bold) }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }, actions = { IconButton(onClick = { globalMyPosts.remove(post); navController.popBackStack() }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = Color.Red) } }) }, bottomBar = { Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(8.dp), verticalAlignment = Alignment.CenterVertically) { OutlinedTextField(value = commentText, onValueChange = { commentText = it }, placeholder = { Text("Thêm bình luận...") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(20.dp)); IconButton(onClick = { if (commentText.isNotBlank()) { post.comments.add(Comment(globalProfileName, commentText)); commentText = "" } }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary) } } }) { padding -> Column(modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) { Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Image(painter = painterResource(id = R.drawable.bg_dolphin), contentDescription = null, modifier = Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(modifier = Modifier.width(12.dp)); Text(globalProfileName, fontWeight = FontWeight.Bold) }; AsyncImage(model = post.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().aspectRatio(1f)); Row(modifier = Modifier.padding(16.dp)) { val isLiked = post.isLiked.value; Icon(imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Like", tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(28.dp).clickable { post.isLiked.value = !post.isLiked.value }); Spacer(modifier = Modifier.width(16.dp)); Icon(Icons.Outlined.ModeComment, contentDescription = "Comment", modifier = Modifier.size(28.dp)); Spacer(modifier = Modifier.width(16.dp)); Icon(Icons.Outlined.Send, contentDescription = "Share", modifier = Modifier.size(28.dp)) }; Column(modifier = Modifier.padding(horizontal = 16.dp)) { Text("${if(post.isLiked.value) "1" else "0"} lượt thích", fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.height(4.dp)); Row { Text(globalProfileName, fontWeight = FontWeight.Bold); Spacer(modifier = Modifier.width(8.dp)); Text("Hôm nay trời đẹp quá! 🐟") } }; Divider(modifier = Modifier.padding(vertical = 12.dp)); Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { Text("Bình luận:", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp)); if (post.comments.isEmpty()) { Text("Chưa có bình luận nào.", color = Color.Gray, fontSize = 14.sp) } else { post.comments.forEach { comment -> Row(modifier = Modifier.padding(vertical = 4.dp)) { Text(comment.userName, fontWeight = FontWeight.Bold, fontSize = 14.sp); Spacer(modifier = Modifier.width(8.dp)); Text(comment.content, fontSize = 14.sp) } } }; Spacer(modifier = Modifier.height(60.dp)) } } } } }
-@OptIn(ExperimentalMaterial3Api::class) @Composable fun FavoritesScreen(navController: NavController) { val favList = largeFishList.filter { favoriteFishIds.contains(it.id) }; Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("Đã Yêu Thích", fontWeight = FontWeight.Bold) }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }) }) { padding -> if (favList.isEmpty()) Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Bạn chưa thả tim con cá nào!", color = Color.Gray) } else LazyColumn(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { items(favList) { fish -> FishListItem(fish = fish, navController = navController) } } } }
-@Composable fun FishListItem(fish: FishProduct, navController: NavController) { Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)).clickable { navController.navigate("fish_detail/${fish.id}") }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { AsyncImage(model = fish.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(70.dp).clip(CircleShape), placeholder = painterResource(R.drawable.bg_dolphin)); Spacer(modifier = Modifier.width(16.dp)); Column(modifier = Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { val isFav = favoriteFishIds.contains(fish.id); Icon(imageVector = if(isFav) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = null, modifier = Modifier.size(20.dp).clickable { toggleFavorite(fish.id) }, tint = if(isFav) Color.Red else Color.Gray); Spacer(modifier = Modifier.width(8.dp)); Text(fish.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface) }; Text(fish.habitat, fontSize = 12.sp, color = Color.Gray); Spacer(modifier = Modifier.height(8.dp)); Text(fish.price, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface) } } }
+@OptIn(ExperimentalMaterial3Api::class) 
+@Composable 
+fun FavoritesScreen(
+    navController: NavController,
+    viewModel: com.example.aqualife.ui.viewmodel.FavoriteViewModel = hiltViewModel()
+) { 
+    val favoriteFish by viewModel.favoriteFish.collectAsState()
+    
+    // Convert FishEntity to FishProduct
+    val favList = favoriteFish.map { entity ->
+        FishProduct(
+            id = entity.id.toIntOrNull() ?: 0,
+            name = entity.name,
+            price = FormatUtils.formatCurrency(entity.priceInt),
+            priceInt = entity.priceInt,
+            imageUrl = entity.imageUrl,
+            category = entity.category,
+            habitat = entity.habitat,
+            maxWeight = entity.maxWeight,
+            diet = entity.diet
+        )
+    }
+    
+    Scaffold(
+        topBar = { 
+            CenterAlignedTopAppBar(
+                title = { Text("Đã Yêu Thích", fontWeight = FontWeight.Bold) }, 
+                navigationIcon = { 
+                    IconButton(onClick = { navController.popBackStack() }) { 
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") 
+                    } 
+                }
+            ) 
+        }
+    ) { padding -> 
+        if (favList.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding), 
+                contentAlignment = Alignment.Center
+            ) { 
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Outlined.FavoriteBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(80.dp),
+                        tint = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Bạn chưa thả tim con cá nào!", color = Color.Gray)
+                }
+            } 
+        } else {
+            LazyColumn(
+                modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background), 
+                contentPadding = PaddingValues(16.dp), 
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) { 
+                items(favList) { fish -> 
+                    FishListItem(fish = fish, navController = navController, viewModel = viewModel) 
+                } 
+            } 
+        } 
+    } 
+}
+@Composable 
+fun FishListItem(
+    fish: FishProduct, 
+    navController: NavController,
+    viewModel: com.example.aqualife.ui.viewmodel.FavoriteViewModel? = null
+) { 
+    val isFavoriteState = if (viewModel != null) {
+        viewModel.isFavorite(fish.id.toString()).collectAsState(initial = false)
+    } else {
+        remember { mutableStateOf(favoriteFishIds.contains(fish.id)) }
+    }
+    val isFavorite by isFavoriteState
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .clickable { navController.navigate("fish_detail/${fish.id}") }
+            .padding(12.dp), 
+        verticalAlignment = Alignment.CenterVertically
+    ) { 
+        AsyncImage(
+            model = fish.imageUrl, 
+            contentDescription = null, 
+            contentScale = ContentScale.Crop, 
+            modifier = Modifier.size(70.dp).clip(CircleShape), 
+            placeholder = painterResource(R.drawable.bg_dolphin)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) { 
+            Row(verticalAlignment = Alignment.CenterVertically) { 
+                Icon(
+                    imageVector = if(isFavorite) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder, 
+                    contentDescription = null, 
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { 
+                            if (viewModel != null) {
+                                viewModel.toggleFavorite(fish.id.toString())
+                            } else {
+                                toggleFavorite(fish.id)
+                            }
+                        }, 
+                    tint = if(isFavorite) Color.Red else Color.Gray
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(fish.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface) 
+            }
+            Text(fish.habitat, fontSize = 12.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(fish.price, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface) 
+        } 
+    } 
+}
 @Composable fun FishDetailScreen(navController: NavController, fishId: Int) { val fish = largeFishList.find { it.id == fishId } ?: largeFishList[0]; val context = LocalContext.current; Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState())) { Box { AsyncImage(model = fish.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(300.dp), placeholder = painterResource(R.drawable.bg_dolphin)); IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.padding(16.dp).background(Color.White.copy(alpha = 0.5f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black) } }; Column(modifier = Modifier.padding(24.dp)) { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(fish.name, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary); val isFav = favoriteFishIds.contains(fish.id); Icon(imageVector = if(isFav) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Like", tint = if(isFav) Color.Red else Color.Gray, modifier = Modifier.size(32.dp).clickable { toggleFavorite(fish.id) }) }; Text(fish.price, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Red); Spacer(modifier = Modifier.height(8.dp)); Text(fish.category, fontSize = 16.sp, color = Color.Gray, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic); Spacer(modifier = Modifier.height(24.dp)); HorizontalDivider(); Spacer(modifier = Modifier.height(24.dp)); DetailItem("🌍 Sống ở đâu", fish.habitat); DetailItem("⚖️ Cân nặng tối đa", fish.maxWeight); DetailItem("🍣 Thích ăn gì", fish.diet); Spacer(modifier = Modifier.height(40.dp)); Button(onClick = { addToCart(fish); Toast.makeText(context, "Đã thêm vào giỏ hàng", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("Thêm vào giỏ hàng") } } } }
 @Composable fun DetailItem(label: String, value: String) { Column(modifier = Modifier.padding(bottom = 16.dp)) { Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground); Spacer(modifier = Modifier.height(4.dp)); Text(value, fontSize = 16.sp, color = Color.Gray) } }
 @Composable fun ProfileStatItem(value: String, label: String) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground); Text(label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground) } }
