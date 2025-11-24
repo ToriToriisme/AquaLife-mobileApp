@@ -63,8 +63,8 @@ This app follows **MVVM (Model-View-ViewModel)** architecture with:
 
 ### 1. Clone Repository
 ```bash
-git clone <repository-url>
-cd AquaLife
+git clone https://github.com/ToriToriisme/AquaLife-mobileApp.git
+cd AquaLife-mobileApp
 ```
 
 ### 2. Firebase Setup
