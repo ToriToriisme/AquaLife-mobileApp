@@ -1,6 +1,8 @@
 package com.example.aqualife.di
 
 import com.example.aqualife.data.remote.AquaLifeApiService
+import com.example.aqualife.data.remote.payment.MomoApiService
+import javax.inject.Named
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -55,6 +57,23 @@ object NetworkModule {
     @Singleton
     fun provideApiService(retrofit: Retrofit): AquaLifeApiService {
         return retrofit.create(AquaLifeApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("momoRetrofit")
+    fun provideMomoRetrofit(okHttpClient: OkHttpClient, gson: Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://test-payment.momo.vn/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideMomoApiService(@Named("momoRetrofit") retrofit: Retrofit): MomoApiService {
+        return retrofit.create(MomoApiService::class.java)
     }
 }
 

@@ -2,6 +2,8 @@ package com.example.aqualife.ui.screen
 
 import android.util.Patterns
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -39,6 +41,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import com.example.aqualife.ui.viewmodel.AuthState
 import com.example.aqualife.ui.viewmodel.AuthViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -75,6 +80,30 @@ fun LoginScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val emailFocusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
+    var showFacebookDialog by remember { mutableStateOf(false) }
+    val googleSignInClient = remember {
+        GoogleSignIn.getClient(
+            context,
+            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .build()
+        )
+    }
+    val googleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val emailValue = account?.email.orEmpty()
+            if (emailValue.isNotBlank()) {
+                val display = account.displayName?.takeIf { it.isNotBlank() } ?: emailValue.substringBefore("@")
+                authViewModel.loginWithGoogleAccount(display, emailValue)
+            } else {
+                Toast.makeText(context, "Không thể lấy thông tin tài khoản Google.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: ApiException) {
+            Toast.makeText(context, "Đăng nhập Google thất bại: ${e.statusCode}", Toast.LENGTH_SHORT).show()
+        }
+    }
     
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.authError.collectAsState()
@@ -439,7 +468,7 @@ fun LoginScreen(
                     
                     // Social login buttons
                     OutlinedButton(
-                        onClick = { navController.navigate("google_login") },
+                        onClick = { googleLauncher.launch(googleSignInClient.signInIntent) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -462,7 +491,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     Button(
-                        onClick = { navController.navigate("facebook_login") },
+                        onClick = { showFacebookDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -510,6 +539,22 @@ fun LoginScreen(
                 onResend = { viewModel.resendVerificationEmail() }
             )
         }
+    }
+
+    if (showFacebookDialog) {
+        FacebookLoginDialog(
+            onDismiss = { showFacebookDialog = false },
+            onSubmit = { fbEmail, fbPassword ->
+                showFacebookDialog = false
+                val emailInput = fbEmail.trim()
+                if (emailInput.isNotBlank()) {
+                    val display = emailInput.substringBefore("@").ifBlank { "Facebook User" }
+                    authViewModel.loginWithFacebookAccount(display, emailInput)
+                } else {
+                    Toast.makeText(context, "Vui lòng nhập email hoặc số điện thoại.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
 }
 
@@ -1280,6 +1325,55 @@ fun FacebookLoginScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(10.dp))
         Text("Quay lại", color = Color.White, modifier = Modifier.clickable { navController.popBackStack() })
     }
+}
+
+@Composable
+private fun FacebookLoginDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (String, String) -> Unit
+) {
+    var emailOrPhone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Đăng nhập Facebook") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = emailOrPhone,
+                    onValueChange = { emailOrPhone = it },
+                    label = { Text("Email hoặc số điện thoại") },
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Mật khẩu") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if ((isValidEmail(emailOrPhone) || isValidPhone(emailOrPhone)) && password.length > 5) {
+                    onSubmit(emailOrPhone, password)
+                } else {
+                    Toast.makeText(context, "Email/SĐT hoặc mật khẩu không hợp lệ.", Toast.LENGTH_SHORT).show()
+                }
+            }) {
+                Text("Đăng nhập")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy")
+            }
+        }
+    )
 }
 
 // --- 5. MÀN HÌNH GOOGLE LOGIN (GIỮ NGUYÊN) ---

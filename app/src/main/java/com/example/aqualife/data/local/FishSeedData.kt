@@ -34,7 +34,7 @@ object FishSeedData {
         FishEntity("sea_18", "Cá Sơn Đá", 130000.0, 130000, "Cá biển", "Hốc đá", "0.3 kg", "Tôm nhỏ", "https://source.unsplash.com/featured/?cardinalfish,fish", "Thịt trắng, thơm, chiên giòn.", System.currentTimeMillis(), 4.2f, 500, false, null),
         FishEntity("sea_19", "Cá Mòi Dầu", 45000.0, 45000, "Cá biển", "Ven bờ", "0.1 kg", "Tảo", "https://source.unsplash.com/featured/?sardine,fish", "Kho cà chua, đóng hộp.", System.currentTimeMillis(), 3.9f, 8000, true, 35000.0),
         FishEntity("sea_20", "Cá Hồi Nauy (Phi lê)", 550000.0, 550000, "Cá biển", "Vùng lạnh", "8 kg", "Cá nhỏ", "https://source.unsplash.com/featured/?salmon,fish", "Nhập khẩu tươi sống, giàu dinh dưỡng nhất.", System.currentTimeMillis(), 5.0f, 5000, false, null)
-    )
+    ).withFishImages()
 
     // Cá Sông (20 loại)
     private fun getRiverFish(): List<FishEntity> = listOf(
@@ -58,7 +58,7 @@ object FishSeedData {
         FishEntity("river_18", "Cá Diếc", 50000.0, 50000, "Cá sông", "Ao hồ", "0.3 kg", "Mùn bã", "https://source.unsplash.com/featured/?cruciancarp,fish", "Kho tương bần, xương mềm.", System.currentTimeMillis(), 4.0f, 2500, false, null),
         FishEntity("river_19", "Cá Rô Phi Đơn Tính", 45000.0, 45000, "Cá sông", "Nước ngọt", "2 kg", "Tạp ăn", "https://source.unsplash.com/featured/?tilapia,fish", "Thịt dày, ít xương, chiên xù.", System.currentTimeMillis(), 4.1f, 9000, true, 40000.0),
         FishEntity("river_20", "Cá Trôi Ấn Độ", 35000.0, 35000, "Cá sông", "Ao nuôi", "4 kg", "Thực vật", "https://source.unsplash.com/featured/?rohu,fish", "Giá rẻ, thịt ngọt, kho dưa.", System.currentTimeMillis(), 3.9f, 1800, false, null)
-    )
+    ).withFishImages()
 
     // Cá Nước Lợ (20 loại)
     private fun getBrackishFish(): List<FishEntity> = listOf(
@@ -82,7 +82,7 @@ object FishSeedData {
         FishEntity("brackish_18", "Cá Kình", 200000.0, 200000, "Cá nước lợ", "Đầm phá", "0.2 kg", "Rong", "https://source.unsplash.com/featured/?rabbitfish,gold", "Thường dùng để đổ bánh khoái cá kình ở Huế.", System.currentTimeMillis(), 4.5f, 900, false, null),
         FishEntity("brackish_19", "Cá Bống Dừa", 110000.0, 110000, "Cá nước lợ", "Rạch dừa", "0.1 kg", "Tạp ăn", "https://source.unsplash.com/featured/?goby,coconut", "Kho tiêu nước dừa sệt sệt.", System.currentTimeMillis(), 4.3f, 2500, false, null),
         FishEntity("brackish_20", "Cá Bống Sao", 130000.0, 130000, "Cá nước lợ", "Bãi bồi", "0.05 kg", "Mùn bã", "https://source.unsplash.com/featured/?mudskipper,fish", "Da có đốm sao xanh, kho rau răm.", System.currentTimeMillis(), 4.4f, 1800, false, null)
-    )
+    ).withFishImages()
 
     // Cá Cảnh (20 loại) - Prices per fish, not per kg
     private fun getAquariumFish(): List<FishEntity> = listOf(
@@ -106,6 +106,13 @@ object FishSeedData {
         FishEntity("pet_18", "Cá Kiếm", 10000.0, 10000, "Cá cảnh", "Bể kính", "6 cm", "Cám", "https://source.unsplash.com/featured/?swordtail,fish", "Đuôi có kiếm dài (con đực), màu đỏ đẹp.", System.currentTimeMillis(), 4.3f, 4000, false, null),
         FishEntity("pet_19", "Cá Pleco (Lau kiếng)", 20000.0, 20000, "Cá cảnh", "Đáy bể", "30 cm", "Rêu", "https://source.unsplash.com/featured/?pleco,fish", "Chuyên dọn bể, ăn rêu và thức ăn thừa.", System.currentTimeMillis(), 4.0f, 3500, false, null),
         FishEntity("pet_20", "Cá Chuột Panda", 25000.0, 25000, "Cá cảnh", "Đáy bể", "4 cm", "Cám chìm", "https://source.unsplash.com/featured/?corydoras,panda", "Dễ thương như gấu trúc, dọn thức ăn đáy.", System.currentTimeMillis(), 4.7f, 2200, false, null)
-    )
-}
+    ).withFishImages()
 
+    private fun List<FishEntity>.withFishImages(): List<FishEntity> {
+        return map { fish ->
+            val keyword = fish.id.replace("_", "")
+            val imageUrl = "https://source.unsplash.com/800x600/?fish,$keyword"
+            fish.copy(imageUrl = imageUrl)
+        }
+    }
+}

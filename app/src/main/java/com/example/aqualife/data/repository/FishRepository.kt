@@ -39,6 +39,24 @@ class FishRepository @Inject constructor(
 
     fun searchFish(query: String): Flow<List<FishEntity>> = fishDao.searchFish(query)
 
+    fun getFilteredFish(
+        category: String? = null,
+        minPrice: Double = 0.0,
+        maxPrice: Double = 100_000_000.0,
+        minRating: Float? = null,
+        onlyDiscount: Boolean = false,
+        sortBy: String = "name"
+    ): Flow<List<FishEntity>> {
+        return fishDao.getFilteredFish(
+            category = category,
+            minPrice = minPrice,
+            maxPrice = maxPrice,
+            minRating = minRating,
+            onlyDiscount = if (onlyDiscount) 1 else 0,
+            sortBy = sortBy
+        )
+    }
+
     /**
      * Start real-time synchronization from Firebase
      * Call this once when app starts (in Application or MainViewModel)
@@ -102,19 +120,9 @@ class FishRepository @Inject constructor(
                         
                         if (snapshot.isEmpty) {
                             Log.d("AquaLife", "Firebase empty. Loading seed data (80 real fish)...")
-                            // Step C: Both empty -> Use seed data
-                            val seedData = FishSeedData.generateRealFishData()
-                            
-                            // C1: Save to Room (for immediate app use)
-                            fishDao.insertAllFish(seedData)
-                            Log.d("AquaLife", "Loaded ${seedData.size} fish to local database")
-                            
-                            // C2: Push to Firebase (for cloud backup & sync)
-                            pushToFirebase(seedData)
-                            
+                            seedLocalDatabaseWithDefaults()
                         } else {
                             Log.d("AquaLife", "Firebase has data. Downloading to local...")
-                            // Step D: Firebase has data -> Download to Room
                             val remoteList = snapshot.documents.mapNotNull { doc ->
                                 try {
                                     FishEntity(
@@ -138,14 +146,19 @@ class FishRepository @Inject constructor(
                                     null
                                 }
                             }
-                            fishDao.insertAllFish(remoteList)
-                            Log.d("AquaLife", "Downloaded ${remoteList.size} fish from Firebase")
+
+                            if (remoteList.isEmpty()) {
+                                Log.w("AquaLife", "Firebase returned 0 fish. Seeding defaults locally.")
+                                seedLocalDatabaseWithDefaults()
+                            } else {
+                                fishDao.insertAllFish(remoteList)
+                                Log.d("AquaLife", "Downloaded ${remoteList.size} fish from Firebase")
+                            }
                         }
                     } catch (e: Exception) {
                         // Firebase connection failed -> Use seed data
                         Log.w("AquaLife", "Firebase unavailable, using seed data: ${e.message}")
-                        val seedData = FishSeedData.generateRealFishData()
-                        fishDao.insertAllFish(seedData)
+                        seedLocalDatabaseWithDefaults()
                     }
                     
                 } else {
@@ -157,6 +170,14 @@ class FishRepository @Inject constructor(
                 Log.e("AquaLife", "Error initializing data: ${e.message}")
             }
         }
+    }
+
+    private suspend fun seedLocalDatabaseWithDefaults() {
+        val seedData = FishSeedData.generateRealFishData()
+        fishDao.insertAllFish(seedData)
+        Log.d("AquaLife", "Saved ${seedData.size} fish to the database")
+        startRealtimeSyncListener()
+        pushToFirebase(seedData)
     }
     
     /**

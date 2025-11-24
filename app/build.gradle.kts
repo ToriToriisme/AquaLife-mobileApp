@@ -61,6 +61,7 @@ dependencies {
     
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("androidx.browser:browser:1.6.0")
     
     // MVVM & Architecture
     implementation(libs.hilt.android)
@@ -87,6 +88,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
     
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)

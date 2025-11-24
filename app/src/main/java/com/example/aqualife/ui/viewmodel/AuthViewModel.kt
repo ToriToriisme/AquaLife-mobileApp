@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aqualife.data.local.dao.UserDao
 import com.example.aqualife.data.local.entity.UserEntity
+import com.example.aqualife.data.preferences.SessionPreferences
+import com.example.aqualife.data.preferences.SessionProvider
+import com.example.aqualife.data.preferences.SessionState
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,7 +29,8 @@ sealed class AuthState {
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    private val sessionPreferences: SessionPreferences
 ) : ViewModel() {
 
     val currentUser: StateFlow<FirebaseUser?> = callbackFlow {
@@ -63,6 +67,13 @@ class AuthViewModel @Inject constructor(
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    val sessionState: StateFlow<SessionState> = sessionPreferences.sessionFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = SessionState()
+        )
 
     private fun isAdminAccount(email: String, password: String): Boolean {
         return email == "admin123" && password == "admin123"
@@ -146,8 +157,12 @@ class AuthViewModel @Inject constructor(
                     if (user.isEmailVerified) {
                         try {
                             persistUser(user)
+                            sessionPreferences.setSession(
+                                provider = SessionProvider.Firebase,
+                                displayName = user.displayName ?: displayNameFromEmail(user.email),
+                                email = user.email
+                            )
                         } catch (e: Exception) {
-                            // Log but don't fail login if DB fails
                             android.util.Log.e("AuthViewModel", "Failed to persist user", e)
                         }
                         _isLoading.value = false
@@ -176,7 +191,29 @@ class AuthViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             firebaseAuth.signOut()
+            sessionPreferences.clearSession()
             _authState.value = AuthState.Idle
+        }
+    }
+
+    fun updateProfile(displayName: String, bio: String) {
+        viewModelScope.launch {
+            val user = firebaseAuth.currentUser ?: return@launch
+            val existing = userDao.getUser(user.uid).firstOrNull()
+            val updatedEntity = (existing ?: UserEntity(
+                uid = user.uid,
+                email = user.email ?: "",
+                displayName = displayName,
+                bio = bio,
+                isEmailVerified = user.isEmailVerified
+            )).copy(
+                displayName = displayName,
+                bio = bio,
+                avatarUrl = existing?.avatarUrl ?: "",
+                isEmailVerified = user.isEmailVerified,
+                lastLogin = System.currentTimeMillis()
+            )
+            userDao.insertUser(updatedEntity)
         }
     }
 
@@ -235,6 +272,60 @@ class AuthViewModel @Inject constructor(
     fun resetState() {
         _authState.value = AuthState.Idle
         _authError.value = null
+    }
+
+    fun loginWithGoogleAccount(displayName: String, email: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val uid = "google_${email.lowercase()}"
+                persistSocialUser(uid, displayName, email)
+                sessionPreferences.setSession(SessionProvider.Google, displayName, email)
+                _authState.value = AuthState.Success
+            } catch (e: Exception) {
+                _authError.value = e.message ?: "Đăng nhập Google thất bại"
+                _authState.value = AuthState.Error(_authError.value ?: "")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun loginWithFacebookAccount(displayName: String, email: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val uid = "facebook_${email.lowercase()}"
+                persistSocialUser(uid, displayName, email)
+                sessionPreferences.setSession(SessionProvider.Facebook, displayName, email)
+                _authState.value = AuthState.Success
+            } catch (e: Exception) {
+                _authError.value = e.message ?: "Đăng nhập Facebook thất bại"
+                _authState.value = AuthState.Error(_authError.value ?: "")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private suspend fun persistSocialUser(uid: String, displayName: String, email: String) {
+        val existing = userDao.getUser(uid).firstOrNull()
+        val entity = (existing ?: UserEntity(
+            uid = uid,
+            email = email,
+            displayName = displayName,
+            isEmailVerified = true
+        )).copy(
+            displayName = displayName,
+            email = email,
+            isEmailVerified = true,
+            lastLogin = System.currentTimeMillis()
+        )
+        userDao.insertUser(entity)
+    }
+
+    private fun displayNameFromEmail(email: String?): String {
+        return email?.substringBefore("@") ?: "AquaLife User"
     }
 
     private suspend fun sendVerificationEmail(user: FirebaseUser) {

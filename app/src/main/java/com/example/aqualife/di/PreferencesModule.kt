@@ -1,6 +1,8 @@
 package com.example.aqualife.di
 
 import android.content.Context
+import com.example.aqualife.data.preferences.SearchHistoryPreferences
+import com.example.aqualife.data.preferences.SessionPreferences
 import com.example.aqualife.data.preferences.ThemePreferences
 import dagger.Module
 import dagger.Provides
@@ -16,6 +18,18 @@ object PreferencesModule {
     @Singleton
     fun provideThemePreferences(@ApplicationContext context: Context): ThemePreferences {
         return ThemePreferences(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSearchHistoryPreferences(@ApplicationContext context: Context): SearchHistoryPreferences {
+        return SearchHistoryPreferences(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSessionPreferences(@ApplicationContext context: Context): SessionPreferences {
+        return SessionPreferences(context)
     }
 }
 

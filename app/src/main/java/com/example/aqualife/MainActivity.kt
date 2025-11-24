@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.aqualife.ui.screen.*
+import com.example.aqualife.ui.viewmodel.AuthViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -24,6 +28,24 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
+                    val authViewModel: AuthViewModel = hiltViewModel()
+                    val currentUser by authViewModel.currentUser.collectAsState()
+                    val sessionState by authViewModel.sessionState.collectAsState()
+
+                    LaunchedEffect(currentUser, sessionState) {
+                        val isLoggedIn = currentUser != null || sessionState.isLoggedIn
+                        val currentRoute = navController.currentDestination?.route
+                        if (isLoggedIn && currentRoute != "home") {
+                            navController.navigate("home") {
+                                popUpTo(0) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        } else if (!isLoggedIn && currentRoute == "home") {
+                            navController.navigate("welcome") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
 
                     NavHost(navController = navController, startDestination = "welcome") {
                         composable("welcome") { WelcomeScreen(onNavigateToLogin = { navController.navigate("login") }, onNavigateToRegister = { navController.navigate("register") }) }
