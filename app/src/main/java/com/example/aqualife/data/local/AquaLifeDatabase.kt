@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
         FavoriteEntity::class,
         NotificationEntity::class
     ],
-    version = 1,
+    version = 2, // Incremented for schema change
     exportSchema = false
 )
 @TypeConverters(Converters::class)

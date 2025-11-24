@@ -15,6 +15,12 @@ data class FishEntity(
     val diet: String,
     val imageUrl: String,
     val description: String = "",
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
+    
+    // Filter & display fields
+    val rating: Float = 4.5f,
+    val soldCount: Int = 0,
+    val hasDiscount: Boolean = false,
+    val discountPrice: Double? = null
 )
 

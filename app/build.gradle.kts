@@ -81,7 +81,7 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
     
-    // Firebase
+    // Firebase - BOM manages all Firebase library versions
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)

@@ -17,12 +17,17 @@ This app follows **MVVM (Model-View-ViewModel)** architecture with:
 ## 📱 Features
 
 ### ✅ Implemented
-- **Authentication**: Firebase Auth with email verification
-- **Product Catalog**: 40-50 fish types per category (Cá biển, Cá sông, Cá nước lợ, Cá cảnh)
+- **Authentication**: Firebase Auth with email verification + Admin bypass (admin123/admin123)
+- **Product Catalog**: **80 real Vietnamese fish** with authentic names and prices
+- **Smart Database**: Auto-initializes with real data, syncs with Firebase
+- **Advanced Search**: Search Vietnamese fish names (e.g., "Cá Lóc", "Cá Rồng")
+- **Category Filtering**: Filter by Cá biển, Cá sông, Cá nước lợ, Cá cảnh
 - **Shopping Cart**: Persistent cart with Room database
-- **Favorites**: Save favorite products
+- **Favorites**: Save favorite products with database persistence
 - **Real-time Sync**: Price updates sync from admin dashboard in < 1 second
-- **Offline Support**: App works offline, shows cached data
+- **Offline Support**: App works offline, shows cached data (80 fish)
+- **Rating System**: Star ratings (3.9-5.0) and best seller tracking
+- **Discount System**: Sale prices and discount badges
 - **Payment**: MoMo & Bank payment (Test mode)
 - **Dark/Light Mode**: Theme toggle with persistence
 - **Skeleton Loading**: Beautiful loading animations
@@ -107,13 +112,21 @@ The app requires:
 
 ## 📊 Database Structure
 
-### Room Database Tables
-- **fish_table**: Product catalog (177+ fish types)
+### Room Database Tables (Version 2)
+- **fish_table**: Product catalog (**80 real Vietnamese fish** with ratings, discounts)
 - **cart_table**: Shopping cart items
-- **user_table**: User profiles
+- **user_table**: User profiles (synced with Firebase Auth)
 - **order_table**: Order history
-- **favorite_table**: Favorite products
+- **favorite_table**: Favorite products (by String ID)
 - **notification_table**: App notifications
+
+### Fish Database Details
+- **Total Fish**: 80 (20 per category)
+- **Categories**: Cá biển, Cá sông, Cá nước lợ, Cá cảnh
+- **Price Range**: 5,000đ - 25,000,000đ
+- **Features**: Rating (4.5★ avg), Best seller tracking, Discount system
+- **Auto-init**: Loads real data on first launch
+- **Sync**: Firebase Firestore real-time updates
 
 ## 🔄 Real-time Synchronization
 

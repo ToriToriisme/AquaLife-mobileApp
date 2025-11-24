@@ -1,13 +1,21 @@
 package com.example.aqualife.data.repository
 
+import android.util.Log
 import com.example.aqualife.data.local.dao.FishDao
 import com.example.aqualife.data.local.entity.FishEntity
+import com.example.aqualife.data.local.FishSeedData
 import com.example.aqualife.data.remote.AquaLifeApiService
 import com.example.aqualife.data.remote.FirebaseSyncService
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,7 +23,8 @@ import javax.inject.Singleton
 class FishRepository @Inject constructor(
     private val fishDao: FishDao,
     private val apiService: AquaLifeApiService,
-    private val firebaseSyncService: FirebaseSyncService
+    private val firebaseSyncService: FirebaseSyncService,
+    private val firestore: FirebaseFirestore
 ) {
     /**
      * Offline-First: Always return data from local database
@@ -75,50 +84,159 @@ class FishRepository @Inject constructor(
     }
 
     /**
-     * Initialize database with default fish data (40-50 per category)
-     * Called on first app install
+     * Initialize database with real fish data
+     * Auto-loads on first app launch - checks Local DB -> Firebase -> Seed Data
      */
-    suspend fun initializeDefaultFish() {
-        val defaultFish = generateDefaultFishData()
-        fishDao.insertAllFish(defaultFish)
-    }
-
-    private fun generateDefaultFishData(): List<FishEntity> {
-        // Generate 40-50 fish per category
-        val categories = listOf("Cá biển", "Cá sông", "Cá nước lợ", "Cá cảnh")
-        val fishList = mutableListOf<FishEntity>()
-        var idCounter = 1
-
-        categories.forEach { category ->
-            val count = when (category) {
-                "Cá biển" -> 45
-                "Cá sông" -> 42
-                "Cá nước lợ" -> 40
-                "Cá cảnh" -> 50
-                else -> 40
-            }
-
-            repeat(count) {
-                fishList.add(
-                    FishEntity(
-                        id = "${category}_$idCounter",
-                        name = "$category Fish $idCounter",
-                        price = (10000..5000000).random().toDouble(),
-                        priceInt = (10000..5000000).random(),
-                        category = category,
-                        habitat = "Habitat for $category",
-                        maxWeight = "${(100..5000).random()}g",
-                        diet = "Diet for $category",
-                        imageUrl = "https://images.unsplash.com/photo-${(1500000000000..1600000000000).random()}?w=500",
-                        description = "Description for $category fish number $idCounter",
-                        lastUpdated = System.currentTimeMillis()
-                    )
-                )
-                idCounter++
+    fun initializeData() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Step A: Check if local database has data
+                val localCount = fishDao.getCount()
+                
+                if (localCount == 0) {
+                    Log.d("AquaLife", "Database empty. Checking Firebase...")
+                    
+                    // Step B: Check if Firebase has data
+                    try {
+                        val snapshot = firestore.collection("products").get().await()
+                        
+                        if (snapshot.isEmpty) {
+                            Log.d("AquaLife", "Firebase empty. Loading seed data (80 real fish)...")
+                            // Step C: Both empty -> Use seed data
+                            val seedData = FishSeedData.generateRealFishData()
+                            
+                            // C1: Save to Room (for immediate app use)
+                            fishDao.insertAllFish(seedData)
+                            Log.d("AquaLife", "Loaded ${seedData.size} fish to local database")
+                            
+                            // C2: Push to Firebase (for cloud backup & sync)
+                            pushToFirebase(seedData)
+                            
+                        } else {
+                            Log.d("AquaLife", "Firebase has data. Downloading to local...")
+                            // Step D: Firebase has data -> Download to Room
+                            val remoteList = snapshot.documents.mapNotNull { doc ->
+                                try {
+                                    FishEntity(
+                                        id = doc.id,
+                                        name = doc.getString("name") ?: "",
+                                        price = doc.getDouble("price") ?: 0.0,
+                                        priceInt = doc.getLong("priceInt")?.toInt() ?: 0,
+                                        category = doc.getString("category") ?: "",
+                                        habitat = doc.getString("habitat") ?: "",
+                                        maxWeight = doc.getString("maxWeight") ?: "",
+                                        diet = doc.getString("diet") ?: "",
+                                        imageUrl = doc.getString("imageUrl") ?: "",
+                                        description = doc.getString("description") ?: "",
+                                        lastUpdated = doc.getLong("lastUpdated") ?: System.currentTimeMillis(),
+                                        rating = doc.getDouble("rating")?.toFloat() ?: 4.5f,
+                                        soldCount = doc.getLong("soldCount")?.toInt() ?: 0,
+                                        hasDiscount = doc.getBoolean("hasDiscount") ?: false,
+                                        discountPrice = doc.getDouble("discountPrice")
+                                    )
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            fishDao.insertAllFish(remoteList)
+                            Log.d("AquaLife", "Downloaded ${remoteList.size} fish from Firebase")
+                        }
+                    } catch (e: Exception) {
+                        // Firebase connection failed -> Use seed data
+                        Log.w("AquaLife", "Firebase unavailable, using seed data: ${e.message}")
+                        val seedData = FishSeedData.generateRealFishData()
+                        fishDao.insertAllFish(seedData)
+                    }
+                    
+                } else {
+                    Log.d("AquaLife", "Database has $localCount fish. Ready to use.")
+                    // Database already populated, start real-time sync
+                    startRealtimeSyncListener()
+                }
+            } catch (e: Exception) {
+                Log.e("AquaLife", "Error initializing data: ${e.message}")
             }
         }
-
-        return fishList
+    }
+    
+    /**
+     * Push fish data to Firebase (batch write)
+     */
+    private fun pushToFirebase(fishList: List<FishEntity>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val batch = firestore.batch()
+                
+                fishList.forEach { fish ->
+                    val docRef = firestore.collection("products").document(fish.id)
+                    val fishMap = hashMapOf(
+                        "name" to fish.name,
+                        "price" to fish.price,
+                        "priceInt" to fish.priceInt,
+                        "category" to fish.category,
+                        "imageUrl" to fish.imageUrl,
+                        "description" to fish.description,
+                        "habitat" to fish.habitat,
+                        "diet" to fish.diet,
+                        "maxWeight" to fish.maxWeight,
+                        "rating" to fish.rating,
+                        "soldCount" to fish.soldCount,
+                        "hasDiscount" to fish.hasDiscount,
+                        "discountPrice" to fish.discountPrice,
+                        "lastUpdated" to fish.lastUpdated
+                    )
+                    batch.set(docRef, fishMap, SetOptions.merge())
+                }
+                
+                batch.commit().await()
+                Log.d("AquaLife", "Pushed ${fishList.size} fish to Firebase successfully!")
+            } catch (e: Exception) {
+                Log.e("AquaLife", "Error pushing to Firebase: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Listen to Firebase real-time updates (price changes from admin dashboard)
+     */
+    private fun startRealtimeSyncListener() {
+        firestore.collection("products").addSnapshotListener { snapshots, e ->
+            if (e != null) {
+                Log.w("AquaLife", "Realtime sync error: ${e.message}")
+                return@addSnapshotListener
+            }
+            
+            val updatedList = snapshots?.documents?.mapNotNull { doc ->
+                try {
+                    FishEntity(
+                        id = doc.id,
+                        name = doc.getString("name") ?: "",
+                        price = doc.getDouble("price") ?: 0.0,
+                        priceInt = doc.getLong("priceInt")?.toInt() ?: 0,
+                        category = doc.getString("category") ?: "",
+                        habitat = doc.getString("habitat") ?: "",
+                        maxWeight = doc.getString("maxWeight") ?: "",
+                        diet = doc.getString("diet") ?: "",
+                        imageUrl = doc.getString("imageUrl") ?: "",
+                        description = doc.getString("description") ?: "",
+                        lastUpdated = doc.getLong("lastUpdated") ?: System.currentTimeMillis(),
+                        rating = doc.getDouble("rating")?.toFloat() ?: 4.5f,
+                        soldCount = doc.getLong("soldCount")?.toInt() ?: 0,
+                        hasDiscount = doc.getBoolean("hasDiscount") ?: false,
+                        discountPrice = doc.getDouble("discountPrice")
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            
+            if (updatedList != null && updatedList.isNotEmpty()) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    fishDao.insertAllFish(updatedList)
+                    Log.d("AquaLife", "Synced ${updatedList.size} fish from Firebase")
+                }
+            }
+        }
     }
 }
 

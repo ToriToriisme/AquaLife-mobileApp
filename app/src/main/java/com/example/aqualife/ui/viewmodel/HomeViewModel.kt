@@ -31,13 +31,14 @@ class HomeViewModel @Inject constructor(
     val error: StateFlow<String?> = _error.asStateFlow()
 
     init {
-        // Start real-time sync when ViewModel is created
+        // Auto-initialize database with 80 real fish on first launch
+        // Handles: Local DB check -> Firebase check -> Seed data
+        repository.initializeData()
+        
+        // Start real-time sync for price updates
         startRealtimeSync()
         
-        // Initialize database if empty
-        initializeIfNeeded()
-        
-        // Check loading state
+        // Monitor data loading status
         checkDataStatus()
     }
 
@@ -50,17 +51,6 @@ class HomeViewModel @Inject constructor(
                 .collect {
                     // Data synced, UI will auto-update via allFish Flow
                 }
-        }
-    }
-
-    private fun initializeIfNeeded() {
-        viewModelScope.launch {
-            repository.getAllFish().first().let { fishList ->
-                if (fishList.isEmpty()) {
-                    // Database is empty, initialize with default data
-                    repository.initializeDefaultFish()
-                }
-            }
         }
     }
 

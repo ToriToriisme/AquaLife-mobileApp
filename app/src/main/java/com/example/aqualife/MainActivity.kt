@@ -50,9 +50,9 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             "fish_detail/{fishId}",
-                            arguments = listOf(navArgument("fishId") { type = NavType.IntType })
+                            arguments = listOf(navArgument("fishId") { type = NavType.StringType })
                         ) { backStackEntry ->
-                            val fishId = backStackEntry.arguments?.getInt("fishId") ?: 1
+                            val fishId = backStackEntry.arguments?.getString("fishId") ?: "sea_01"
                             FishDetailScreen(navController, fishId)
                         }
                         composable(

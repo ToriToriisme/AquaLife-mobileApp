@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -19,7 +20,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SkeletonBox(
     modifier: Modifier = Modifier,
-    shape: androidx.compose.foundation.shape.Shape = RoundedCornerShape(8.dp)
+    shape: Shape = RoundedCornerShape(8.dp)
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
     val alpha by infiniteTransition.animateFloat(
@@ -82,11 +83,13 @@ fun SkeletonFishCard() {
 
 @Composable
 fun SkeletonGrid() {
+    // Fixed height to avoid infinite constraints error when inside scrollable Column
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         contentPadding = PaddingValues(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.height(600.dp) // Fixed height to prevent crash
     ) {
         items(6) {
             SkeletonFishCard()

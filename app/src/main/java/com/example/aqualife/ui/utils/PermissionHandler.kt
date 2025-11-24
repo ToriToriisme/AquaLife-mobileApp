@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 
@@ -49,6 +50,7 @@ fun rememberAllMediaPermissionsState() = rememberMultiplePermissionsState(
     }
 )
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun usePermissions(
     onPermissionsGranted: () -> Unit = {},
@@ -63,7 +65,7 @@ fun usePermissions(
     return remember {
         object : PermissionState {
             override fun requestCamera() {
-                if (cameraPermission.hasPermission) {
+                if (cameraPermission.status.isGranted) {
                     onPermissionsGranted()
                 } else {
                     cameraPermission.launchPermissionRequest()
@@ -79,18 +81,18 @@ fun usePermissions(
             }
             
             override fun requestMicrophone() {
-                if (microphonePermission.hasPermission) {
+                if (microphonePermission.status.isGranted) {
                     onPermissionsGranted()
                 } else {
                     microphonePermission.launchPermissionRequest()
                 }
             }
             
-            override fun hasCameraPermission(): Boolean = cameraPermission.hasPermission
+            override fun hasCameraPermission(): Boolean = cameraPermission.status.isGranted
             
             override fun hasStoragePermission(): Boolean = storagePermissions.allPermissionsGranted
             
-            override fun hasMicrophonePermission(): Boolean = microphonePermission.hasPermission
+            override fun hasMicrophonePermission(): Boolean = microphonePermission.status.isGranted
             
             override fun shouldShowRationale(): Boolean = showRationale
         }
