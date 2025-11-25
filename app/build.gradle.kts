@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
-    alias(libs.plugins.kotlin.kapt)
+    id("com.google.devtools.ksp")
     alias(libs.plugins.google.services)
 }
 
@@ -13,12 +13,17 @@ android {
 
     defaultConfig {
         applicationId = "com.example.aqualife"
-        minSdk = 29
-        targetSdk = 36
+        minSdk = 24  // Giảm từ 29 xuống 24 để hỗ trợ Android 7.0+ (nhiều thiết bị hơn)
+        targetSdk = 34  // Giảm từ 36 xuống 34 để tương thích tốt hơn
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Hỗ trợ tất cả kiến trúc CPU phổ biến
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
@@ -65,7 +70,7 @@ dependencies {
     
     // MVVM & Architecture
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
@@ -73,7 +78,7 @@ dependencies {
     // Room Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    kapt(libs.room.compiler)
+    ksp(libs.room.compiler)
     
     // Network
     implementation(libs.retrofit)

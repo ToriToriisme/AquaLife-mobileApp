@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
         FavoriteEntity::class,
         NotificationEntity::class
     ],
-    version = 2, // Incremented for schema change
+    version = 6, // Incremented to add imageUrl to NotificationEntity
     exportSchema = false
 )
 @TypeConverters(Converters::class)

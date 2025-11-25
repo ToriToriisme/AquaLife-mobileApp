@@ -38,7 +38,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -49,17 +49,33 @@ import androidx.compose.material3.ListItem
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.animation.core.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
@@ -76,6 +92,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.example.aqualife.utils.FormatUtils
 import com.example.aqualife.ui.viewmodel.HomeDisplayState
 import com.example.aqualife.data.local.entity.FishEntity
@@ -111,51 +129,27 @@ data class UserPost(
 )
 
 // --- 2. DỮ LIỆU ---
+// NOTE: generateRealFishList() đã được thay thế bởi FishSeedData.generateRealFishData()
+// Dữ liệu cá giờ được lấy từ Room Database thông qua FishRepository
+// Hàm này được giữ lại để tương thích ngược nếu có code cũ còn sử dụng
+@Deprecated("Use FishRepository.getAllFish() instead. Data is now loaded from Room Database via FishSeedData.")
 fun generateRealFishList(): List<FishProduct> {
-    return listOf(
-        FishProduct(1, "Cá Hề Nemo", "120.000 đ", 120000, "https://images.unsplash.com/photo-1544552866-d3ed42536cfd?w=500", "Cá biển", "Rạn san hô", "250g", "Tảo, sinh vật phù du"),
-        FishProduct(2, "Cá Đuôi Gai Xanh", "350.000 đ", 350000, "https://images.unsplash.com/photo-1520253276376-6230bb9382cb?w=500", "Cá biển", "Rạn san hô", "400g", "Tảo biển"),
-        FishProduct(3, "Cá Betta Halfmoon", "80.000 đ", 80000, "https://images.unsplash.com/photo-1534531173927-aeb928d54385?w=500", "Cá cảnh", "Nước ngọt tĩnh", "50g", "Trùng chỉ"),
-        FishProduct(4, "Cá Rồng Huyết Long", "15.000.000 đ", 15000000, "https://images.unsplash.com/photo-1621809609483-240d677cb945?w=500", "Cá cảnh", "Sông Amazon", "2kg", "Cá nhỏ, côn trùng"),
-        FishProduct(5, "Cá Koi Kohaku", "2.500.000 đ", 2500000, "https://images.unsplash.com/photo-1517363898874-737b6217096a?w=500", "Cá cảnh", "Hồ cá Koi", "5kg", "Cám cá Koi, rau"),
-        FishProduct(6, "Cá Dĩa Discus", "400.000 đ", 400000, "https://images.unsplash.com/photo-1535591273668-578e31182c4f?w=500", "Cá cảnh", "Sông Amazon", "300g", "Tim bò xay"),
-        FishProduct(7, "Cá La Hán", "1.200.000 đ", 1200000, "https://plus.unsplash.com/premium_photo-1666299356479-42b0a7d079c1?w=500", "Cá cảnh", "Nước ngọt", "1kg", "Tôm tép"),
-        FishProduct(8, "Cá Bảy Màu (Guppy)", "10.000 đ", 10000, "https://plus.unsplash.com/premium_photo-1673446573020-164728b02393?w=500", "Cá cảnh", "Nước ngọt", "10g", "Rong rêu"),
-        FishProduct(9, "Cá Lóc Hoàng Đế", "850.000 đ", 850000, "https://images.unsplash.com/photo-1597954765323-494dc940d93c?w=500", "Cá sông", "Sông Ấn Độ", "3kg", "Cá mồi"),
-        FishProduct(10, "Cá Hồng Két", "150.000 đ", 150000, "https://images.unsplash.com/photo-1518827337089-379e083742c0?w=500", "Cá cảnh", "Lai tạo", "1kg", "Thức ăn viên"),
-        FishProduct(11, "Cá Chép Sư Tử", "50.000 đ", 50000, "https://images.unsplash.com/photo-1522853100303-3dc7399491bc?w=500", "Cá sông", "Sông hồ", "2kg", "Tạp ăn"),
-        FishProduct(12, "Cá Ali Thái", "45.000 đ", 45000, "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=500", "Cá cảnh", "Hồ Malawi", "200g", "Thức ăn viên"),
-        FishProduct(13, "Cá Hải Tượng", "50.000.000 đ", 50000000, "https://images.unsplash.com/photo-1559252820-963df22c9df0?w=500", "Cá sông", "Sông Amazon", "200kg", "Cá lớn, gà vịt"),
-        FishProduct(14, "Sứa Mặt Trăng", "150.000 đ", 150000, "https://images.unsplash.com/photo-1500339310309-a34999977824?w=500", "Cá biển", "Đại dương", "1kg", "Ấu trùng Artemia"),
-        FishProduct(15, "Cá Heo Mũi Chai", "500.000.000 đ", 500000000, "https://images.unsplash.com/photo-1570481662006-a3a1374699e8?w=500", "Cá biển", "Đại dương", "300kg", "Cá nhỏ, mực"),
-        FishProduct(16, "Cá Ngừ Đại Dương", "200.000 đ", 200000, "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=500", "Cá biển", "Biển khơi", "60kg", "Cá cơm, mực"),
-        FishProduct(17, "Cá Thu Nhật", "180.000 đ", 180000, "https://images.unsplash.com/photo-1599084993091-1cb5c0721cc6?w=500", "Cá biển", "Biển ôn đới", "5kg", "Cá nhỏ"),
-        FishProduct(18, "Cá Chẽm (Vược)", "220.000 đ", 220000, "https://images.unsplash.com/photo-1535591273668-578e31182c4f?w=500", "Cá nước lợ", "Cửa sông", "10kg", "Tôm, cá nhỏ"),
-        FishProduct(19, "Cá Mú Trân Châu", "350.000 đ", 350000, "https://images.unsplash.com/photo-1524704654690-b56c05c78a00?w=500", "Cá biển", "Rạn san hô", "15kg", "Cua, cá con"),
-        FishProduct(20, "Cá Bống Tượng", "450.000 đ", 450000, "https://images.unsplash.com/photo-1621809609483-240d677cb945?w=500", "Cá sông", "Sông Cửu Long", "2kg", "Tép, cá con"),
-        FishProduct(21, "Cá Trắm Đen", "120.000 đ", 120000, "https://images.unsplash.com/photo-1522853100303-3dc7399491bc?w=500", "Cá sông", "Ao hồ lớn", "30kg", "Ốc, hến"),
-        FishProduct(22, "Cá Chim Vây Vàng", "160.000 đ", 160000, "https://images.unsplash.com/photo-1535591273668-578e31182c4f?w=500", "Cá nước lợ", "Ven biển", "3kg", "Tảo, động vật thân mềm"),
-        FishProduct(23, "Cá Tai Tượng", "90.000 đ", 90000, "https://images.unsplash.com/photo-1522519965392-1eead138b020?w=500", "Cá cảnh", "Sông Congo", "300g", "Côn trùng, quả"),
-        FishProduct(24, "Cá Neon Vua", "15.000 đ", 15000, "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=500", "Cá cảnh", "Sông Nam Mỹ", "5g", "Bo bo, cám mịn"),
-        FishProduct(25, "Cá Phượng Hoàng", "40.000 đ", 40000, "https://images.unsplash.com/photo-1544552866-d3ed42536cfd?w=500", "Cá cảnh", "Venezuela", "20g", "Trùng huyết"),
-        FishProduct(26, "Cá Ông Tiên", "30.000 đ", 30000, "https://images.unsplash.com/photo-1520253276376-6230bb9382cb?w=500", "Cá cảnh", "Sông Amazon", "100g", "Tép, cám"),
-        FishProduct(27, "Cá Sấu Hỏa Tiễn", "300.000 đ", 300000, "https://images.unsplash.com/photo-1559252820-963df22c9df0?w=500", "Cá cảnh", "Bắc Mỹ", "10kg", "Cá mồi"),
-        FishProduct(28, "Cá Hô", "1.500.000 đ", 1500000, "https://images.unsplash.com/photo-1599084993091-1cb5c0721cc6?w=500", "Cá sông", "Sông Mê Kông", "100kg", "Rong, trái cây"),
-        FishProduct(29, "Cá Chạch Lấu", "400.000 đ", 400000, "https://images.unsplash.com/photo-1597954765323-494dc940d93c?w=500", "Cá sông", "Suối đá", "1kg", "Côn trùng nước"),
-        FishProduct(30, "Cá Nâu", "180.000 đ", 180000, "https://images.unsplash.com/photo-1535591273668-578e31182c4f?w=500", "Cá nước lợ", "Rừng ngập mặn", "500g", "Rong rêu")
-    )
+    // Return empty list - data should come from database
+    return emptyList()
 }
 
 // --- 3. GLOBAL STATE ---
-val largeFishList = generateRealFishList()
+// NOTE: largeFishList không còn được sử dụng. Dữ liệu cá được lấy từ database qua ViewModel
+@Deprecated("Use HomeViewModel.allFish or HomeViewModel.homeFishList instead")
+val largeFishList = emptyList<FishProduct>()
 val globalMyPosts = mutableStateListOf<UserPost>()
 
-// DỮ LIỆU BANNER (4 LOẠI CÁ) - Ảnh thật chất lượng cao
+// DỮ LIỆU BANNER (4 LOẠI CÁ) - Using picsum.photos for stable images
 val banners = listOf(
-    BannerItem("Cá Biển", "https://images.unsplash.com/photo-1582967788606-a171f1080ca8?w=800", "Cá biển"),
-    BannerItem("Cá Sông", "https://images.unsplash.com/photo-1516967931949-2620222137be?w=800", "Cá sông"),
-    BannerItem("Cá Nước Lợ", "https://images.unsplash.com/photo-1516683669143-3b3667902497?w=800", "Cá nước lợ"),
-    BannerItem("Cá Cảnh", "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=800", "Cá cảnh")
+    BannerItem("Cá Biển", "https://picsum.photos/seed/banner_sea/800/400", "Cá biển"),
+    BannerItem("Cá Sông", "https://picsum.photos/seed/banner_river/800/400", "Cá sông"),
+    BannerItem("Cá Nước Lợ", "https://picsum.photos/seed/banner_brackish/800/400", "Cá nước lợ"),
+    BannerItem("Cá Cảnh", "https://picsum.photos/seed/banner_pet/800/400", "Cá cảnh")
 )
 
 // --- 4. THEME MANAGER ---
@@ -264,24 +258,52 @@ fun HomeScreenContent(
     val bgColor = MaterialTheme.colorScheme.background
     val focusManager = LocalFocusManager.current
     
-    val isLoading by viewModel.isLoading.collectAsState()
     val allFish by viewModel.allFish.collectAsState()
-    val homeFish by viewModel.homeFishList.collectAsState()
     val displayState by viewModel.displayState.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
     val favoriteEntities by favoriteViewModel.favoriteFish.collectAsState()
 
-    val homeFishProducts = remember(homeFish) { homeFish.map { it.toFishProduct() } }
+    val homeFishProducts = remember(allFish) { allFish.map { it.toFishProduct() } }
     val allFishProducts = remember(allFish) { allFish.map { it.toFishProduct() } }
     val favoriteProducts = remember(favoriteEntities) { favoriteEntities.map { it.toFishProduct() } }
     val favoriteIdSet = remember(favoriteEntities) { favoriteEntities.map { it.id }.toSet() }
     
-    var searchField by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var searchField by rememberSaveable(stateSaver = TextFieldValue.Saver) { 
+        mutableStateOf(TextFieldValue("", TextRange.Zero)) 
+    }
     val searchText = searchField.text
+    // Helper function to normalize Vietnamese text for accent-insensitive search
+    fun normalizeVietnamese(text: String): String {
+        return text.lowercase()
+            .replace("á", "a").replace("à", "a").replace("ả", "a").replace("ã", "a").replace("ạ", "a")
+            .replace("ă", "a").replace("ắ", "a").replace("ằ", "a").replace("ẳ", "a").replace("ẵ", "a").replace("ặ", "a")
+            .replace("â", "a").replace("ấ", "a").replace("ầ", "a").replace("ẩ", "a").replace("ẫ", "a").replace("ậ", "a")
+            .replace("é", "e").replace("è", "e").replace("ẻ", "e").replace("ẽ", "e").replace("ẹ", "e")
+            .replace("ê", "e").replace("ế", "e").replace("ề", "e").replace("ể", "e").replace("ễ", "e").replace("ệ", "e")
+            .replace("í", "i").replace("ì", "i").replace("ỉ", "i").replace("ĩ", "i").replace("ị", "i")
+            .replace("ó", "o").replace("ò", "o").replace("ỏ", "o").replace("õ", "o").replace("ọ", "o")
+            .replace("ô", "o").replace("ố", "o").replace("ồ", "o").replace("ổ", "o").replace("ỗ", "o").replace("ộ", "o")
+            .replace("ơ", "o").replace("ớ", "o").replace("ờ", "o").replace("ở", "o").replace("ỡ", "o").replace("ợ", "o")
+            .replace("ú", "u").replace("ù", "u").replace("ủ", "u").replace("ũ", "u").replace("ụ", "u")
+            .replace("ư", "u").replace("ứ", "u").replace("ừ", "u").replace("ử", "u").replace("ữ", "u").replace("ự", "u")
+            .replace("ý", "y").replace("ỳ", "y").replace("ỷ", "y").replace("ỹ", "y").replace("ỵ", "y")
+            .replace("đ", "d")
+    }
+    
     val searchResults = remember(searchText, allFishProducts) {
         if (searchText.isBlank()) emptyList() 
-        else allFishProducts.filter { it.name.contains(searchText, ignoreCase = true) }
+        else {
+            val normalizedSearch = normalizeVietnamese(searchText)
+            allFishProducts.filter { fish ->
+                val normalizedName = normalizeVietnamese(fish.name)
+                normalizedName.contains(normalizedSearch) || fish.name.contains(searchText, ignoreCase = true)
+            }
+        }
     }
+    
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val coroutineScope = rememberCoroutineScope()
 
     val pagerState = rememberPagerState(pageCount = { banners.size })
     LaunchedEffect(Unit) {
@@ -289,6 +311,12 @@ fun HomeScreenContent(
             delay(3000)
             pagerState.animateScrollToPage((pagerState.currentPage + 1) % banners.size)
         }
+    }
+    
+    // Auto-request focus when screen loads (for keyboard to show)
+    LaunchedEffect(Unit) {
+        delay(300) // Small delay to ensure screen is ready
+        searchFocusRequester.requestFocus()
     }
 
     Column(
@@ -299,15 +327,29 @@ fun HomeScreenContent(
     ) {
         OutlinedTextField(
             value = searchField,
-            onValueChange = { searchField = it },
+            onValueChange = { newValue ->
+                // Preserve composition state - use compositionText if available
+                searchField = if (newValue.composition != null) {
+                    // Keep composition state for IME input
+                    newValue
+                } else {
+                    // Normal update
+                    TextFieldValue(newValue.text, newValue.selection, newValue.composition)
+                }
+            },
             placeholder = { Text("Tìm kiếm...", color = Color.Gray) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
             trailingIcon = {
-        if (searchText.isNotEmpty()) {
+                if (searchText.isNotEmpty()) {
                     IconButton(onClick = { 
                         viewModel.addSearchHistory(searchText.trim())
-                        searchField = TextFieldValue("")
-                        focusManager.clearFocus()
+                        // Clear properly - reset to empty with proper TextRange
+                        searchField = TextFieldValue("", TextRange.Zero)
+                        // Keep focus - simplified
+                        coroutineScope.launch {
+                            delay(200)
+                            searchFocusRequester.requestFocus()
+                        }
                     }) {
                         Icon(Icons.Default.Clear, contentDescription = null)
                     }
@@ -315,12 +357,23 @@ fun HomeScreenContent(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(56.dp)
+                .focusRequester(searchFocusRequester)
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused) {
+                        // Show keyboard when focused - simplified
+                        coroutineScope.launch {
+                            delay(150)
+                            keyboardController?.show()
+                        }
+                    }
+                },
             shape = RoundedCornerShape(28.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,
-                autoCorrect = false,
+                autoCorrectEnabled = false,
+                keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Search
             ),
             keyboardActions = KeyboardActions(
@@ -338,28 +391,6 @@ fun HomeScreenContent(
             )
         )
         Spacer(modifier = Modifier.height(16.dp))
-
-        if (favoriteProducts.isNotEmpty()) {
-            FavoriteChipRow(
-                favorites = favoriteProducts,
-                onChipClick = { fish ->
-                    val fishId = if (fish.entityId.isNotEmpty()) fish.entityId else "sea_01"
-                    navController.navigate("fish_detail/$fishId")
-                }
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        if (searchHistory.isNotEmpty()) {
-            HistoryChips(
-                history = searchHistory,
-                onHistorySelected = { term ->
-                    searchField = TextFieldValue(term, TextRange(term.length))
-                    viewModel.addSearchHistory(term)
-                }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
 
         if (searchText.isNotBlank()) {
             SearchResultSection(
@@ -385,7 +416,7 @@ fun HomeScreenContent(
                 HomeDisplayState.DefaultView -> {
                     DefaultHomeSection(
                         fishList = homeFishProducts,
-                        isLoading = isLoading,
+                        isLoading = false,
                         navController = navController,
                         onGoToCart = onGoToCart,
                         lazyRowState = lazyRowState,
@@ -437,7 +468,7 @@ private fun SearchResultSection(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalAnimationApi::class)
 @Composable
 private fun DefaultHomeSection(
     fishList: List<FishProduct>,
@@ -558,19 +589,31 @@ private fun DefaultHomeSection(
                 state = lazyRowState,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                        items(fishList.take(20)) { fish -> 
+                items(fishList.take(20).size) { index ->
+                    val fish = fishList[index]
                     val favoriteKey = if (fish.entityId.isNotEmpty()) fish.entityId else fish.id.toString()
-                    FishItemCard(
-                        fish = fish,
-                        onClick = {
-                            val fishId = if (fish.entityId.isNotEmpty()) fish.entityId else "sea_01"
-                            navController.navigate("fish_detail/$fishId")
-                        },
-                        isFavorite = favoriteIds.contains(favoriteKey),
-                        onToggleFavorite = { onToggleFavorite(favoriteKey) }
-                    )
-                        } 
+                    var visible by remember { mutableStateOf(false) }
+                    LaunchedEffect(index) {
+                        delay(index * 50L)
+                        visible = true
                     }
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut() + slideOutVertically()
+                    ) {
+                        FishItemCard(
+                            fish = fish,
+                            onClick = {
+                                val fishId = if (fish.entityId.isNotEmpty()) fish.entityId else "sea_01"
+                                navController.navigate("fish_detail/$fishId")
+                            },
+                            isFavorite = favoriteIds.contains(favoriteKey),
+                            onToggleFavorite = { onToggleFavorite(favoriteKey) }
+                        )
+                    }
+                }
+            }
                 }
                 Spacer(modifier = Modifier.height(80.dp))
             }
@@ -631,15 +674,43 @@ private fun HistoryChips(
     history: List<String>,
     onHistorySelected: (String) -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        history.forEach { term ->
+        history.forEachIndexed { index, term ->
+            var isPressed by remember { mutableStateOf(false) }
+            val chipScale by animateFloatAsState(
+                targetValue = if (isPressed) 0.95f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessHigh
+                ),
+                label = "historyChipScale"
+            )
+            LaunchedEffect(index) {
+                delay(index * 30L)
+            }
             AssistChip(
-                onClick = { onHistorySelected(term) },
-                label = { Text(term, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                onClick = { 
+                    isPressed = true
+                    onHistorySelected(term)
+                    coroutineScope.launch {
+                        delay(100)
+                        isPressed = false
+                    }
+                },
+                label = { 
+                    Text(
+                        term, 
+                        maxLines = 1, 
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.scale(chipScale)
+                    ) 
+                },
+                modifier = Modifier.scale(chipScale)
             )
         }
     }
@@ -651,7 +722,14 @@ private fun FavoriteChipRow(
     favorites: List<FishProduct>,
     onChipClick: (FishProduct) -> Unit
 ) {
-    Text("Yêu thích của bạn", fontWeight = FontWeight.Bold)
+    val coroutineScope = rememberCoroutineScope()
+    Text(
+        "Yêu thích của bạn", 
+        fontWeight = FontWeight.Bold,
+        fontSize = 18.sp,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.padding(bottom = 12.dp)
+    )
     FlowRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -659,10 +737,36 @@ private fun FavoriteChipRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        favorites.forEach { fish ->
+        favorites.forEachIndexed { index, fish ->
+            var isPressed by remember { mutableStateOf(false) }
+            val chipScale by animateFloatAsState(
+                targetValue = if (isPressed) 0.95f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessHigh
+                ),
+                label = "chipScale"
+            )
+            LaunchedEffect(index) {
+                delay(index * 50L)
+            }
             SuggestionChip(
-                onClick = { onChipClick(fish) },
-                label = { Text(fish.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                onClick = { 
+                    isPressed = true
+                    onChipClick(fish)
+                    coroutineScope.launch {
+                        delay(100)
+                        isPressed = false
+                    }
+                },
+                label = { 
+                    Text(
+                        fish.name, 
+                        maxLines = 1, 
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.scale(chipScale)
+                    ) 
+                },
                 icon = {
                     Icon(
                         imageVector = Icons.Rounded.Favorite,
@@ -670,7 +774,8 @@ private fun FavoriteChipRow(
                         tint = Color.Red,
                         modifier = Modifier.size(16.dp)
                     )
-                }
+                },
+                modifier = Modifier.scale(chipScale)
             )
         }
     }
@@ -964,7 +1069,7 @@ fun CartItemRow(
     } 
 }
 // --- 8. SEARCH SCREEN - UPDATED TO USE DATABASE ---
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable 
 fun SearchScreen(
     navController: NavController,
@@ -972,7 +1077,9 @@ fun SearchScreen(
     favoriteViewModel: FavoriteViewModel = hiltViewModel()
 ) {
     val focusManager = LocalFocusManager.current
-    var searchField by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var searchField by rememberSaveable(stateSaver = TextFieldValue.Saver) { 
+        mutableStateOf(TextFieldValue("", TextRange.Zero)) 
+    }
     var selectedCategory by rememberSaveable { mutableStateOf("all") }
     var selectedSort by rememberSaveable { mutableStateOf("best_seller") }
     var discountOnly by rememberSaveable { mutableStateOf(false) }
@@ -1035,17 +1142,48 @@ fun SearchScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
+        val searchFocusRequester2 = remember { FocusRequester() }
+        val keyboardController2 = LocalSoftwareKeyboardController.current
+        val coroutineScope2 = rememberCoroutineScope()
+        
+        // Auto-request focus when SearchScreen loads
+        LaunchedEffect(Unit) {
+            delay(300)
+            searchFocusRequester2.requestFocus()
+        }
+        
         OutlinedTextField(
             value = searchField,
-            onValueChange = { searchField = it },
+            onValueChange = { newValue ->
+                // Preserve composition state for IME input (Telex)
+                searchField = if (newValue.composition != null) {
+                    // Keep composition state for IME
+                    newValue
+                } else {
+                    // Normal update - preserve selection
+                    TextFieldValue(newValue.text, newValue.selection, newValue.composition)
+                }
+            },
             placeholder = { Text("Nhập tên cá...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(searchFocusRequester2)
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused) {
+                        // Show keyboard when focused - simplified
+                        coroutineScope2.launch {
+                            delay(150)
+                            keyboardController2?.show()
+                        }
+                    }
+                },
             shape = RoundedCornerShape(12.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,
-                autoCorrect = false,
+                autoCorrectEnabled = false,
+                keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Search
             ),
             keyboardActions = KeyboardActions(
@@ -1062,9 +1200,15 @@ fun SearchScreen(
                 if (searchText.isNotBlank()) {
                     IconButton(onClick = { 
                         viewModel.addSearchHistory(searchText.trim())
-                        focusManager.clearFocus()
+                        // Clear properly - reset to empty with proper TextRange
+                        searchField = TextFieldValue("", TextRange.Zero)
+                        // Keep focus - simplified
+                        coroutineScope2.launch {
+                            delay(200)
+                            searchFocusRequester2.requestFocus()
+                        }
                     }) {
-                        Icon(Icons.Default.Check, contentDescription = "Tìm kiếm")
+                        Icon(Icons.Default.Clear, contentDescription = "Xóa")
                     }
                 }
             }
@@ -1119,17 +1263,14 @@ fun SearchScreen(
         if (history.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             Text("Lịch sử tìm kiếm", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-            LazyRow(
-                modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(history) { item ->
-                    AssistChip(
-                        onClick = { searchField = TextFieldValue(item, TextRange(item.length)) },
-                        label = { Text(item) }
-                    )
+            Spacer(modifier = Modifier.height(8.dp))
+            HistoryChips(
+                history = history,
+                onHistorySelected = { term ->
+                    searchField = TextFieldValue(term, TextRange(term.length))
+                    viewModel.addSearchHistory(term)
                 }
-            }
+            )
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -1170,7 +1311,7 @@ fun SearchScreen(
         }
     }
 }
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class) 
 @Composable
 fun ProfileScreen(
     navController: NavController,
@@ -1316,8 +1457,8 @@ fun ProfileScreen(
             text = {
                 Column {
                     ListItem(
-                        headlineText = { Text("Chọn ảnh từ thư viện") },
-                        supportingText = { Text("Tải ảnh có sẵn trong máy của bạn") },
+                        headlineContent = { Text("Chọn ảnh từ thư viện") },
+                        supportingContent = { Text("Tải ảnh có sẵn trong máy của bạn") },
                         leadingContent = { Icon(Icons.Default.Image, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1328,8 +1469,8 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     ListItem(
-                        headlineText = { Text("Chụp ảnh mới") },
-                        supportingText = { Text("Mở camera để chụp ảnh và đăng ngay") },
+                        headlineContent = { Text("Chụp ảnh mới") },
+                        supportingContent = { Text("Mở camera để chụp ảnh và đăng ngay") },
                         leadingContent = { Icon(Icons.Default.CameraAlt, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1524,8 +1665,10 @@ fun FishItemCard(
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.width(140.dp).clickable { onClick() }
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isFavorite) 8.dp else 2.dp),
+        modifier = Modifier
+            .width(140.dp)
+            .clickable { onClick() }
     ) {
         Column {
             Box {
@@ -1537,15 +1680,31 @@ fun FishItemCard(
                     placeholder = painterResource(R.drawable.bg_dolphin),
                     error = painterResource(R.drawable.bg_dolphin)
                 )
+                var favoriteState by remember(isFavorite) { mutableStateOf(isFavorite) }
+                LaunchedEffect(isFavorite) {
+                    favoriteState = isFavorite
+                }
+                val favoriteScale by animateFloatAsState(
+                    targetValue = if (favoriteState) 1.15f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "favoriteIconScale"
+                )
                 Icon(
-                    imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                    imageVector = if (favoriteState) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = "Like",
-                    tint = if (isFavorite) Color.Red else Color.White,
+                    tint = if (favoriteState) Color.Red else Color.White,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .size(24.dp)
-                        .clickable { onToggleFavorite() }
+                        .scale(favoriteScale)
+                        .clickable { 
+                            favoriteState = !favoriteState
+                            onToggleFavorite()
+                        }
                 )
             }
             Column(modifier = Modifier.padding(8.dp)) {
@@ -1632,7 +1791,7 @@ fun PostDetailScreen(
                         commentText = ""
                     }
                 }) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -1670,7 +1829,7 @@ fun PostDetailScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Icon(Icons.Outlined.ModeComment, contentDescription = "Comment", modifier = Modifier.size(28.dp))
                 Spacer(modifier = Modifier.width(16.dp))
-                Icon(Icons.Outlined.Send, contentDescription = "Share", modifier = Modifier.size(28.dp))
+                Icon(Icons.Filled.Send, contentDescription = "Share", modifier = Modifier.size(28.dp))
             }
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text("${if (post.isLiked.value) "1" else "0"} lượt thích", fontWeight = FontWeight.Bold)
@@ -1700,7 +1859,7 @@ fun PostDetailScreen(
         }
     }
 }
-@OptIn(ExperimentalMaterial3Api::class) 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) 
 @Composable 
 fun FavoritesScreen(
     navController: NavController,
@@ -1736,9 +1895,15 @@ fun FavoritesScreen(
             ) 
         }
     ) { padding -> 
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
         if (favList.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding), 
+                    modifier = Modifier.fillMaxSize(), 
                 contentAlignment = Alignment.Center
             ) { 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1753,18 +1918,37 @@ fun FavoritesScreen(
                 }
             } 
         } else {
+                // Add Favorite Chips at the top
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    FavoriteChipRow(
+                        favorites = favList,
+                        onChipClick = { fish ->
+                            val fishId = if (fish.entityId.isNotEmpty()) fish.entityId else "sea_01"
+                            navController.navigate("fish_detail/$fishId")
+                        }
+                    )
+                }
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                
+                // List of favorite items
             LazyColumn(
-                modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background), 
+                    modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp), 
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) { 
                 items(favList) { fish -> 
-                    FishListItem(
-                        fish = fish,
-                        navController = navController,
-                        isFavorite = true,
-                        onToggleFavorite = { favoriteKey -> viewModel.toggleFavorite(favoriteKey) }
-                    )
+                        FishListItem(
+                            fish = fish,
+                            navController = navController,
+                            isFavorite = true,
+                            onToggleFavorite = { favoriteKey -> viewModel.toggleFavorite(favoriteKey) }
+                        )
+                    } 
                 } 
             } 
         } 
@@ -1823,10 +2007,15 @@ fun FishDetailScreen(
     navController: NavController, 
     fishId: String,
     viewModel: com.example.aqualife.ui.viewmodel.HomeViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
-    cartViewModel: com.example.aqualife.ui.viewmodel.CartViewModel = hiltViewModel()
+    cartViewModel: com.example.aqualife.ui.viewmodel.CartViewModel = hiltViewModel(),
+    favoriteViewModel: FavoriteViewModel = hiltViewModel()
 ) {
     val fishEntity by viewModel.allFish.collectAsState()
     val fish = fishEntity.find { it.id == fishId }
+    val favoriteFish by favoriteViewModel.favoriteFish.collectAsState()
+    val isFavorite = remember(fishId, favoriteFish) { 
+        favoriteFish.any { it.id == fishId }
+    }
     
     if (fish == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1852,6 +2041,7 @@ fun FishDetailScreen(
     )
     
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     
     Column(
         modifier = Modifier
@@ -1887,11 +2077,40 @@ fun FishDetailScreen(
                     fontWeight = FontWeight.Bold, 
                     color = MaterialTheme.colorScheme.primary
                 )
+                var favoriteState by remember { mutableStateOf(isFavorite) }
+                LaunchedEffect(isFavorite) {
+                    favoriteState = isFavorite
+                }
+                val scale by animateFloatAsState(
+                    targetValue = if (favoriteState) 1.2f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "favoriteScale"
+                )
+                val alpha by animateFloatAsState(
+                    targetValue = if (favoriteState) 1f else 0.7f,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "favoriteAlpha"
+                )
                 Icon(
-                    imageVector = Icons.Outlined.FavoriteBorder, 
+                    imageVector = if (favoriteState) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder, 
                     contentDescription = "Like", 
-                    tint = Color.Gray, 
-                    modifier = Modifier.size(32.dp).clickable { /* Add to favorites */ }
+                    tint = if (favoriteState) Color.Red else Color.Gray, 
+                    modifier = Modifier
+                        .size(32.dp)
+                        .scale(scale)
+                        .alpha(alpha)
+                        .clickable { 
+                            favoriteState = !favoriteState
+                            favoriteViewModel.toggleFavorite(fishId)
+                            Toast.makeText(
+                                context, 
+                                if (favoriteState) "Đã thêm vào yêu thích ❤️" else "Đã xóa khỏi yêu thích",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                 )
             }
             
@@ -1918,15 +2137,45 @@ fun FishDetailScreen(
             DetailItem("🍣 Thích ăn gì", fishProduct.diet)
             
             Spacer(modifier = Modifier.height(40.dp))
+            var isAddingToCart by remember { mutableStateOf(false) }
+            val buttonScale by animateFloatAsState(
+                targetValue = if (isAddingToCart) 0.95f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessHigh
+                ),
+                label = "buttonScale"
+            )
+            val buttonColor by animateColorAsState(
+                targetValue = if (isAddingToCart) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary,
+                animationSpec = tween(durationMillis = 200),
+                label = "buttonColor"
+            )
             Button(
                 onClick = { 
+                    isAddingToCart = true
                     cartViewModel.addToCart(fish)
-                    Toast.makeText(context, "Đã thêm vào giỏ hàng", Toast.LENGTH_SHORT).show() 
+                    Toast.makeText(context, "Đã thêm vào giỏ hàng 🛒", Toast.LENGTH_SHORT).show()
+                    coroutineScope.launch {
+                        delay(200)
+                        isAddingToCart = false
+                    }
                 }, 
-                modifier = Modifier.fillMaxWidth().height(50.dp), 
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .scale(buttonScale), 
+                colors = ButtonDefaults.buttonColors(containerColor = buttonColor)
             ) { 
-                Text("Thêm vào giỏ hàng") 
+                if (isAddingToCart) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Thêm vào giỏ hàng", fontWeight = FontWeight.Bold) 
+                }
             }
         }
     }

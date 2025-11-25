@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaLife APK - Download QR Code</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            color: #333;
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .info-item {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .qr-code {
+            margin: 30px 0;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+        .qr-code img {
+            max-width: 100%;
+            height: auto;
+            border: 4px solid #667eea;
+            border-radius: 15px;
+            padding: 10px;
+            background: white;
+        }
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 30px 0;
+            text-align: left;
+            font-size: 14px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #856404;
+            font-size: 18px;
+        }
+        .instructions ol {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+        .instructions li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .note {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+            font-size: 13px;
+            color: #0c5460;
+        }
+        .upload-section {
+            background: #e7f3ff;
+            border: 2px dashed #667eea;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            color: #004085;
+        }
+        .upload-section h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐟 AquaLife Mobile App</h1>
+        <p class="subtitle">Ứng dụng mua bán cá trực tuyến</p>
+        
+        <div class="info">
+            <div class="info-item">
+                <span class="info-label">Tên ứng dụng:</span> AquaLife
+            </div>
+            <div class="info-item">
+                <span class="info-label">Phiên bản:</span> 1.0
+            </div>
+            <div class="info-item">
+                <span class="info-label">Nền tảng:</span> Android
+            </div>
+        </div>
+        
+        <div class="upload-section">
+            <h3>📤 Bước 1: Upload APK lên hosting</h3>
+            <p style="text-align: left; margin: 10px 0;">
+                Để tạo QR code tải APK, bạn cần upload file APK lên một dịch vụ hosting:
+            </p>
+            <ul style="text-align: left; margin: 10px 0;">
+                <li><strong>Google Drive:</strong> Upload → Chia sẻ công khai → Lấy link</li>
+                <li><strong>GitHub Releases:</strong> Tạo release mới → Upload APK</li>
+                <li><strong>Firebase Hosting:</strong> Upload và lấy URL public</li>
+                <li><strong>Dropbox:</strong> Upload → Chia sẻ → Lấy link</li>
+            </ul>
+        </div>
+        
+        <div class="qr-code">
+            <h3 style="color: #667eea; margin-bottom: 15px;">📱 QR Code sẽ xuất hiện ở đây</h3>
+            <p style="color: #666; margin-top: 15px;">
+                Sau khi upload APK và có link download, sử dụng script:<br/>
+                <code style="background: #f0f0f0; padding: 5px 10px; border-radius: 5px; font-size: 12px;">
+                    scripts\create-apk-qr-with-url.ps1 -DownloadUrl "YOUR_LINK"
+                </code>
+            </p>
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 Hướng dẫn cài đặt:</h3>
+            <ol>
+                <li><strong>Quét mã QR</strong> bằng camera điện thoại Android</li>
+                <li>Nhấn vào link để tải file APK về</li>
+                <li>Mở file APK đã tải (thường ở thư mục Downloads)</li>
+                <li>Nếu có cảnh báo "Cài đặt từ nguồn không xác định":
+                    <ul style="margin-top: 5px;">
+                        <li>Vào <strong>Cài đặt → Bảo mật</strong></li>
+                        <li>Bật <strong>"Cho phép cài đặt từ nguồn không xác định"</strong></li>
+                        <li>Hoặc cho phép cài đặt từ trình duyệt/file manager đang dùng</li>
+                        <li>Quay lại và nhấn <strong>"Cài đặt"</strong></li>
+                    </ul>
+                </li>
+                <li>Chờ quá trình cài đặt hoàn tất</li>
+                <li>Mở ứng dụng AquaLife từ màn hình chính</li>
+            </ol>
+        </div>
+        
+        <div class="note">
+            <strong>💡 Lưu ý quan trọng:</strong><br/>
+            • File APK chỉ dành cho thiết bị Android (không dùng được trên iOS)<br/>
+            • Đảm bảo thiết bị có kết nối Internet để tải APK<br/>
+            • Nếu gặp lỗi "Không thể cài đặt", kiểm tra lại cài đặt bảo mật<br/>
+            • Kích thước APK khoảng 20-50 MB, cần đủ dung lượng trống
+        </div>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+            <p style="margin: 0; color: #666; font-size: 12px;">
+                📧 <strong>Liên hệ hỗ trợ:</strong> Nếu gặp vấn đề, vui lòng liên hệ với người phát triển ứng dụng
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

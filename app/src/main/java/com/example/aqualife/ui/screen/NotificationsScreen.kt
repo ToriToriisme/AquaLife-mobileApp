@@ -1,26 +1,55 @@
 package com.example.aqualife.ui.screen
 
+// ============================================================================
+// ANDROIDX IMPORTS
+// ============================================================================
+// Compose Foundation
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+
+// Compose Material Icons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+
+// Compose Material3
 import androidx.compose.material3.*
+
+// Compose Runtime
 import androidx.compose.runtime.*
+
+// Compose UI
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+// Navigation
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.aqualife.ui.viewmodel.NotificationViewModel
+
+// ============================================================================
+// THIRD-PARTY IMPORTS
+// ============================================================================
+import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.*
+
+// ============================================================================
+// LOCAL IMPORTS
+// ============================================================================
+import com.example.aqualife.ui.viewmodel.NotificationViewModel
+
+// ============================================================================
+// NOTIFICATIONS SCREEN
+// ============================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +129,10 @@ fun NotificationsScreen(
     }
 }
 
+// ============================================================================
+// NOTIFICATION ITEM COMPONENT
+// ============================================================================
+
 @Composable
 fun NotificationItem(
     notification: com.example.aqualife.data.local.entity.NotificationEntity,
@@ -139,12 +172,24 @@ fun NotificationItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = iconColor
-            )
+            // Show image if available, otherwise show icon
+            if (notification.imageUrl != null && notification.imageUrl.isNotBlank()) {
+                AsyncImage(
+                    model = notification.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = iconColor
+                )
+            }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -182,6 +227,10 @@ fun NotificationItem(
     }
 }
 
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
 fun formatNotificationTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
@@ -194,4 +243,3 @@ fun formatNotificationTime(timestamp: Long): String {
         else -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(timestamp))
     }
 }
-

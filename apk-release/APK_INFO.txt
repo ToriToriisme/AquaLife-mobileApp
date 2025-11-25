@@ -1,0 +1,37 @@
+﻿========================================
+AquaLife Mobile App - APK Information
+========================================
+
+File Name: app-debug.apk
+File Size: 76.84 MB
+Build Date: 2025-11-25 11:48:52
+Location: apk-release\app-debug.apk
+
+========================================
+HÆ°á»›ng dáº«n chia sáº» APK qua QR Code:
+========================================
+
+1. Upload APK lÃªn má»™t dá»‹ch vá»¥ hosting:
+   - Google Drive: Upload file, chia sáº» cÃ´ng khai, láº¥y link
+   - GitHub Releases: Táº¡o release má»›i vÃ  upload APK
+   - Firebase Hosting: Upload vÃ  láº¥y URL
+   - Dropbox: Upload vÃ  láº¥y link chia sáº»
+
+2. Táº¡o QR code tá»« link download:
+   - Truy cáº­p: https://www.qr-code-generator.com/
+   - DÃ¡n link download APK
+   - Táº£i QR code vá»
+
+3. Hoáº·c sá»­ dá»¥ng script nÃ y vá»›i URL:
+   - Sá»­a biáº¿n $downloadUrl trong script
+   - Cháº¡y láº¡i script Ä‘á»ƒ táº¡o QR code má»›i
+
+========================================
+QR Code API (Ä‘á»ƒ táº¡o QR tá»« URL):
+========================================
+
+https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=YOUR_URL_HERE
+
+Thay YOUR_URL_HERE báº±ng link download APK cá»§a báº¡n.
+
+========================================

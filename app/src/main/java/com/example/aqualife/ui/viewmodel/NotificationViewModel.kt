@@ -53,6 +53,27 @@ class NotificationViewModel @Inject constructor(
         }
     }
 
+    fun createOrderNotification(
+        notificationId: String,
+        title: String,
+        message: String,
+        fishImageUrl: String? = null
+    ) {
+        viewModelScope.launch {
+            notificationDao.insertNotification(
+                NotificationEntity(
+                    id = notificationId,
+                    title = title,
+                    message = message,
+                    type = "ORDER",
+                    isRead = false,
+                    createdAt = System.currentTimeMillis(),
+                    imageUrl = fishImageUrl
+                )
+            )
+        }
+    }
+
     // Create sample notifications for demo
     fun createSampleNotifications() {
         viewModelScope.launch {

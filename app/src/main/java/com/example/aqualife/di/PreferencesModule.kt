@@ -14,22 +14,8 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object PreferencesModule {
-    @Provides
-    @Singleton
-    fun provideThemePreferences(@ApplicationContext context: Context): ThemePreferences {
-        return ThemePreferences(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideSearchHistoryPreferences(@ApplicationContext context: Context): SearchHistoryPreferences {
-        return SearchHistoryPreferences(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideSessionPreferences(@ApplicationContext context: Context): SessionPreferences {
-        return SessionPreferences(context)
-    }
+    // All preference classes (ThemePreferences, SearchHistoryPreferences, SessionPreferences)
+    // have @Inject constructors, so Hilt handles them automatically.
+    // No manual @Provides needed.
 }
 

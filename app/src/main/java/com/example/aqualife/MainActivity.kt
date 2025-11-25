@@ -3,10 +3,12 @@ package com.example.aqualife
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,6 +17,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.example.aqualife.ui.screen.*
 import com.example.aqualife.ui.viewmodel.AuthViewModel
@@ -43,6 +46,25 @@ class MainActivity : ComponentActivity() {
                         } else if (!isLoggedIn && currentRoute == "home") {
                             navController.navigate("welcome") {
                                 popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
+
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = navBackStackEntry?.destination?.route
+
+                    // Handle back button press safely
+                    BackHandler(enabled = currentRoute != "welcome" && currentRoute != "home") {
+                        if (navController.previousBackStackEntry != null) {
+                            navController.popBackStack()
+                        } else {
+                            // If no back stack, navigate to home
+                            if (currentRoute != "home") {
+                                navController.navigate("home") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else {
+                                finish() // Exit app if already at home
                             }
                         }
                     }

@@ -10,6 +10,6 @@ data class NotificationEntity(
     val message: String,
     val type: String, // ORDER, PROMOTION, SYSTEM
     val isRead: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val imageUrl: String? = null // Optional image URL for notifications (e.g., fish image for order notifications)
 )
-

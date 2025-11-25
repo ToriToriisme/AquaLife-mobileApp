@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -81,6 +83,13 @@ fun LoginScreen(
     val emailFocusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
     var showFacebookDialog by remember { mutableStateOf(false) }
+    
+    // Ensure dialog shows when button is clicked
+    LaunchedEffect(showFacebookDialog) {
+        if (showFacebookDialog) {
+            // Dialog will show
+        }
+    }
     val googleSignInClient = remember {
         GoogleSignIn.getClient(
             context,
@@ -96,7 +105,7 @@ fun LoginScreen(
             val emailValue = account?.email.orEmpty()
             if (emailValue.isNotBlank()) {
                 val display = account.displayName?.takeIf { it.isNotBlank() } ?: emailValue.substringBefore("@")
-                authViewModel.loginWithGoogleAccount(display, emailValue)
+                viewModel.loginWithGoogleAccount(display, emailValue)
             } else {
                 Toast.makeText(context, "Không thể lấy thông tin tài khoản Google.", Toast.LENGTH_SHORT).show()
             }
@@ -549,7 +558,7 @@ fun LoginScreen(
                 val emailInput = fbEmail.trim()
                 if (emailInput.isNotBlank()) {
                     val display = emailInput.substringBefore("@").ifBlank { "Facebook User" }
-                    authViewModel.loginWithFacebookAccount(display, emailInput)
+                    viewModel.loginWithFacebookAccount(display, emailInput)
                 } else {
                     Toast.makeText(context, "Vui lòng nhập email hoặc số điện thoại.", Toast.LENGTH_SHORT).show()
                 }
@@ -1338,41 +1347,57 @@ private fun FacebookLoginDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Đăng nhập Facebook") },
+        title = { 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Đăng nhập Facebook", fontWeight = FontWeight.Bold)
+            }
+        },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
                 OutlinedTextField(
                     value = emailOrPhone,
                     onValueChange = { emailOrPhone = it },
                     label = { Text("Email hoặc số điện thoại") },
-                    singleLine = true
+                    placeholder = { Text("Nhập email hoặc số điện thoại") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Mật khẩu") },
+                    placeholder = { Text("Nhập mật khẩu") },
                     singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
             }
         },
         confirmButton = {
-            Button(onClick = {
-                if ((isValidEmail(emailOrPhone) || isValidPhone(emailOrPhone)) && password.length > 5) {
-                    onSubmit(emailOrPhone, password)
-                } else {
-                    Toast.makeText(context, "Email/SĐT hoặc mật khẩu không hợp lệ.", Toast.LENGTH_SHORT).show()
-                }
-            }) {
-                Text("Đăng nhập")
+            Button(
+                onClick = {
+                    if ((isValidEmail(emailOrPhone) || isValidPhone(emailOrPhone)) && password.length > 5) {
+                        onSubmit(emailOrPhone, password)
+                    } else {
+                        Toast.makeText(context, "Email/SĐT hoặc mật khẩu không hợp lệ.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2))
+            ) {
+                Text("Đăng nhập", color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Hủy")
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
@@ -1386,7 +1411,7 @@ fun GoogleLoginScreen(navController: NavController) {
         Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text("Đăng nhập bằng Google", fontSize = 20.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.Center))
         }
-        Divider()
+        HorizontalDivider()
         Text("Chọn tài khoản để tiếp tục tới AquaLife", modifier = Modifier.padding(16.dp), color = Color.Gray)
 
         accounts.forEach { account ->

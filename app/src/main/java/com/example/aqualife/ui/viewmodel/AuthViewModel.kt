@@ -1,12 +1,14 @@
 package com.example.aqualife.ui.viewmodel
 
+// ============================================================================
+// ANDROIDX IMPORTS
+// ============================================================================
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.aqualife.data.local.dao.UserDao
-import com.example.aqualife.data.local.entity.UserEntity
-import com.example.aqualife.data.preferences.SessionPreferences
-import com.example.aqualife.data.preferences.SessionProvider
-import com.example.aqualife.data.preferences.SessionState
+
+// ============================================================================
+// THIRD-PARTY IMPORTS
+// ============================================================================
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,8 +17,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
+
+// ============================================================================
+// LOCAL IMPORTS
+// ============================================================================
+import com.example.aqualife.data.local.dao.CartDao
+import com.example.aqualife.data.local.dao.FavoriteDao
+import com.example.aqualife.data.local.dao.UserDao
+import com.example.aqualife.data.local.entity.UserEntity
+import com.example.aqualife.data.preferences.SearchHistoryPreferences
+import com.example.aqualife.data.preferences.SessionPreferences
+import com.example.aqualife.data.preferences.SessionProvider
+import com.example.aqualife.data.preferences.SessionState
+
+// ============================================================================
+// AUTH VIEWMODEL
+// ============================================================================
 
 sealed class AuthState {
     object Idle : AuthState()
@@ -30,7 +47,10 @@ sealed class AuthState {
 class AuthViewModel @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val userDao: UserDao,
-    private val sessionPreferences: SessionPreferences
+    private val sessionPreferences: SessionPreferences,
+    private val cartDao: CartDao,
+    private val favoriteDao: FavoriteDao,
+    private val searchHistoryPreferences: SearchHistoryPreferences
 ) : ViewModel() {
 
     val currentUser: StateFlow<FirebaseUser?> = callbackFlow {
@@ -190,6 +210,8 @@ class AuthViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
+            // KHÔNG XÓA DATA - Chỉ clear session
+            // Data vẫn được giữ trong DB với userId, sẽ tự động load lại khi login
             firebaseAuth.signOut()
             sessionPreferences.clearSession()
             _authState.value = AuthState.Idle
@@ -336,4 +358,3 @@ class AuthViewModel @Inject constructor(
         }
     }
 }
-
